@@ -117,6 +117,9 @@ async function refresh(s: YahooSession, origin: string): Promise<YahooSession> {
 
 export class YahooAuthError extends Error {}
 
+/** A Yahoo Fantasy API call failed; `message` includes Yahoo's description. */
+export class YahooApiError extends Error {}
+
 /** Yahoo refused a token request; `message` is Yahoo's short error code. */
 export class YahooTokenError extends Error {}
 
@@ -135,7 +138,12 @@ export async function yahooGet(path: string, session: YahooSession, origin: stri
     res = await call(s.accessToken);
   }
   if (res.status === 401) throw new YahooAuthError("Yahoo session expired");
-  if (!res.ok) throw new Error(`Yahoo API ${res.status}`);
+  if (!res.ok) {
+    // Yahoo's error body says what's wrong (e.g. a bad resource path); safe to show.
+    const text = await res.text().catch(() => "");
+    const desc = text.match(/"description"\s*:\s*"([^"]+)"/)?.[1] ?? text.match(/<description>([^<]+)</)?.[1] ?? "";
+    throw new YahooApiError(`Yahoo API ${res.status}${desc ? `: ${desc.slice(0, 160)}` : ""}`);
+  }
   return { json: (await res.json()) as unknown, session: s, refreshed: s !== session };
 }
 

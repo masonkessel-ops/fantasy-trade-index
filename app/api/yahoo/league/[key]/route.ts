@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { directoryFor, getMatcher } from "@/lib/leagueImport";
-import { YahooAuthError, readSession, writeSession, yahooConfigured, yahooGet } from "@/lib/yahoo";
+import { YahooApiError, YahooAuthError, readSession, writeSession, yahooConfigured, yahooGet } from "@/lib/yahoo";
 import { parseLeague } from "@/lib/yahooParse";
 
 /** GET /api/yahoo/league/:key — one Yahoo league (settings, standings, every roster), mapped to our player IDs. */
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/yahoo/league
       await writeSession(null);
       return NextResponse.json({ error: "Your Yahoo sign-in expired. Sign in again.", signedOut: true }, { status: 401 });
     }
-    return NextResponse.json({ error: "Couldn't load that Yahoo league. Try again in a moment." }, { status: 502 });
+    const detail = e instanceof YahooApiError ? ` (${e.message})` : e instanceof Error ? ` (${e.message.slice(0, 120)})` : "";
+    return NextResponse.json({ error: `Couldn't load that Yahoo league${detail}.` }, { status: 502 });
   }
 }

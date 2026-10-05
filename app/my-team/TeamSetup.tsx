@@ -323,9 +323,9 @@ function YahooImport({ onFinish }: { onFinish: Finish }) {
         <SignOutYahoo onDone={() => setStatus({ ...status, signedIn: false })} />
       </div>
       {!leagues ? (
-        <p className="flex items-center gap-2 text-sm text-muted"><Loader2 className="size-4 animate-spin" /> Loading leagues…</p>
+        error ? null : <p className="flex items-center gap-2 text-sm text-muted"><Loader2 className="size-4 animate-spin" /> Loading leagues…</p>
       ) : leagues.length === 0 ? (
-        <p className="text-sm text-muted">No Yahoo NFL leagues found for this season.</p>
+        <p className="text-sm text-muted">No Yahoo NFL leagues found on this Yahoo account. Make sure you signed in with the account that owns your fantasy team.</p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {leagues.map((l, i) => (
