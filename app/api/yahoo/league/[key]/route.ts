@@ -24,7 +24,13 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/yahoo/league
   } catch (e) {
     if (e instanceof YahooAuthError) {
       await writeSession(null);
-      return NextResponse.json({ error: "Your Yahoo sign-in expired. Sign in again.", signedOut: true }, { status: 401 });
+      return NextResponse.json(
+        {
+          error: `Yahoo wouldn't share your fantasy data (${e.message}). In your Yahoo app (developer.yahoo.com/apps), make sure API Permissions includes Fantasy Sports → Read, then sign in again.`,
+          signedOut: true,
+        },
+        { status: 401 },
+      );
     }
     const detail = e instanceof YahooApiError ? ` (${e.message})` : e instanceof Error ? ` (${e.message.slice(0, 120)})` : "";
     return NextResponse.json({ error: `Couldn't load that Yahoo league${detail}.` }, { status: 502 });

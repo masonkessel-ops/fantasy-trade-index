@@ -84,21 +84,44 @@ export function TeamSetup({
 type Finish = (data: LeagueResponse, rosterId: number, username?: string) => void;
 
 /** "Which team is yours?" when the platform didn't tell us. */
-function TeamPicker({ data, onPick, onBack, reason }: { data: LeagueResponse; onPick: (rosterId: number) => void; onBack: () => void; reason: string }) {
+function TeamPicker({
+  data,
+  onPick,
+  onBack,
+  reason,
+  suggested,
+}: {
+  data: LeagueResponse;
+  onPick: (rosterId: number) => void;
+  onBack: () => void;
+  reason: string;
+  suggested?: number | null;
+}) {
+  const teams = [...data.league.teams].sort((a, b) => (a.rosterId === suggested ? -1 : b.rosterId === suggested ? 1 : 0));
   return (
     <div>
       <button onClick={onBack} className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
         <ChevronLeft className="size-4" /> Back
       </button>
       <h3 className="font-display text-2xl font-bold uppercase">Which team is yours?</h3>
-      <p className="mb-4 text-sm text-muted">{reason}</p>
+      <p className="mb-1 text-sm text-muted">{reason}</p>
+      <p className="mb-4 text-xs text-faint">
+        {data.league.name} · {data.league.teams.length} teams
+      </p>
+      <UnmatchedNote data={data} />
       <div className="grid gap-2 sm:grid-cols-2">
-        {data.league.teams.map((t) => (
+        {teams.map((t) => (
           <button
             key={t.rosterId}
             onClick={() => onPick(t.rosterId)}
-            className="flex items-center gap-3 rounded-2xl border border-line bg-surface-2 p-3 text-left transition hover:border-rocket/40"
+            className={clsx(
+              "relative flex items-center gap-3 rounded-2xl border p-3 text-left transition hover:border-rocket/40",
+              t.rosterId === suggested ? "border-rocket/50 bg-rocket/10" : "border-line bg-surface-2",
+            )}
           >
+            {t.rosterId === suggested && (
+              <span className="absolute -top-2 right-3 rounded-full bg-rocket px-2 py-0.5 text-[10px] font-bold text-bg">Looks like you</span>
+            )}
             <Avatar src={t.avatar} label={t.teamName} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">{t.teamName}</span>
@@ -183,8 +206,7 @@ function SleeperImport({ onFinish }: { onFinish: Finish }) {
     try {
       const data = await fetchSleeperLeague(l.leagueId);
       const mine = data.league.teams.find((t) => t.ownerId === user!.userId);
-      if (mine) onFinish(data, mine.rosterId, user!.username);
-      else setPicking(data);
+      setPicking({ ...data, league: { ...data.league, myRosterId: mine?.rosterId ?? null } });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -198,7 +220,8 @@ function SleeperImport({ onFinish }: { onFinish: Finish }) {
         data={picking}
         onBack={() => setPicking(null)}
         onPick={(id) => onFinish(picking, id, user!.username)}
-        reason={`We couldn't match your account to a roster in ${picking.league.name}.`}
+        suggested={picking.league.myRosterId}
+        reason="Pick your team so we know which players are yours."
       />
     );
 
@@ -259,8 +282,10 @@ function YahooImport({ onFinish }: { onFinish: Finish }) {
       const data = await res.json().catch(() => ({}));
       if (cancelled) return;
       if (res.ok) setLeagues(data.leagues);
-      else if (data.signedOut) setStatus({ ...me, signedIn: false });
-      else setError(data.error ?? "Couldn't load your Yahoo leagues.");
+      else {
+        if (data.signedOut) setStatus({ ...me, signedIn: false });
+        setError(data.error ?? "Couldn't load your Yahoo leagues.");
+      }
     })();
     return () => {
       cancelled = true;
@@ -271,9 +296,7 @@ function YahooImport({ onFinish }: { onFinish: Finish }) {
     setBusy(l.leagueKey);
     setError(null);
     try {
-      const data = await fetchYahooLeague(l.leagueKey);
-      if (data.league.myRosterId != null) onFinish(data, data.league.myRosterId);
-      else setPicking(data);
+      setPicking(await fetchYahooLeague(l.leagueKey));
     } catch (err) {
       if (err instanceof LeagueError && err.signedOut) setStatus((s) => (s ? { ...s, signedIn: false } : s));
       setError((err as Error).message);
@@ -283,7 +306,15 @@ function YahooImport({ onFinish }: { onFinish: Finish }) {
   }
 
   if (picking)
-    return <TeamPicker data={picking} onBack={() => setPicking(null)} onPick={(id) => onFinish(picking, id)} reason="Yahoo didn't say which team is yours." />;
+    return (
+      <TeamPicker
+        data={picking}
+        onBack={() => setPicking(null)}
+        onPick={(id) => onFinish(picking, id)}
+        suggested={picking.league.myRosterId}
+        reason="Pick your team so we know which players are yours."
+      />
+    );
 
   if (!status) return <p className="flex items-center gap-2 text-sm text-muted"><Loader2 className="size-4 animate-spin" /> Checking Yahoo…</p>;
 
@@ -372,9 +403,7 @@ function EspnImport({ onFinish }: { onFinish: Finish }) {
     setError(null);
     try {
       const cookies = showPrivate && espnS2.trim() && swid.trim() ? { espnS2: espnS2.trim(), swid: swid.trim() } : undefined;
-      const data = await fetchEspnLeague(id, cookies);
-      if (data.league.myRosterId != null) onFinish(data, data.league.myRosterId);
-      else setPicking(data);
+      setPicking(await fetchEspnLeague(id, cookies));
     } catch (err) {
       if (err instanceof LeagueError && err.needsCookies) setShowPrivate(true);
       setError((err as Error).message);
@@ -385,10 +414,13 @@ function EspnImport({ onFinish }: { onFinish: Finish }) {
 
   if (picking)
     return (
-      <div>
-        <UnmatchedNote data={picking} />
-        <TeamPicker data={picking} onBack={() => setPicking(null)} onPick={(id) => onFinish(picking, id)} reason={`Pick your team in ${picking.league.name}.`} />
-      </div>
+      <TeamPicker
+        data={picking}
+        onBack={() => setPicking(null)}
+        onPick={(id) => onFinish(picking, id)}
+        suggested={picking.league.myRosterId}
+        reason="Pick your team so we know which players are yours."
+      />
     );
 
   return (

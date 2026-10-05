@@ -137,7 +137,12 @@ export async function yahooGet(path: string, session: YahooSession, origin: stri
     s = await refresh(s, origin).catch(() => Promise.reject(new YahooAuthError("Yahoo session expired")));
     res = await call(s.accessToken);
   }
-  if (res.status === 401) throw new YahooAuthError("Yahoo session expired");
+  if (res.status === 401) {
+    // Usually the token works but the Yahoo app lacks the Fantasy Sports permission.
+    const text = await res.text().catch(() => "");
+    const desc = text.match(/"description"\s*:\s*"([^"]+)"/)?.[1] ?? text.match(/<description>([^<]+)</)?.[1] ?? text.match(/oauth_problem="?([a-z_]+)/)?.[1] ?? "";
+    throw new YahooAuthError(desc.slice(0, 200) || "Yahoo rejected the sign-in token");
+  }
   if (!res.ok) {
     // Yahoo's error body says what's wrong (e.g. a bad resource path); safe to show.
     const text = await res.text().catch(() => "");
