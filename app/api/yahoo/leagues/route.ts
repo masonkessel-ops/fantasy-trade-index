@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { YahooApiError, YahooAuthError, readSession, writeSession, yahooConfigured, yahooGet, type YahooSession } from "@/lib/yahoo";
+import { YahooApiError, YahooAuthError, readSession, yahooAuthHelp, writeSession, yahooConfigured, yahooGet, type YahooSession } from "@/lib/yahoo";
 import { parseUserLeagues } from "@/lib/yahooParse";
 
 /** GET /api/yahoo/leagues — the signed-in user's Yahoo NFL leagues (this season first). */
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       await writeSession(null);
       return NextResponse.json(
         {
-          error: `Yahoo wouldn't share your fantasy data (${e.message}). In your Yahoo app (developer.yahoo.com/apps), make sure API Permissions includes Fantasy Sports → Read, then sign in again.`,
+          error: yahooAuthHelp(e.message),
           signedOut: true,
         },
         { status: 401 },

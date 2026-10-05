@@ -115,7 +115,26 @@ async function refresh(s: YahooSession, origin: string): Promise<YahooSession> {
   return { ...s, accessToken: t.access_token, refreshToken: t.refresh_token || s.refreshToken, expiresAt: Date.now() + (t.expires_in - 60) * 1000 };
 }
 
+/** Thrown when Yahoo rejects the user's token; `message` is Yahoo's oauth_problem code (e.g. token_rejected). */
 export class YahooAuthError extends Error {}
+
+/**
+ * Pull the useful part out of a Yahoo error response. Yahoo puts it in a JSON
+ * description like: Please provide valid credentials. OAuth oauth_problem="token_rejected", realm="yahooapis.com"
+ * (and sometimes the WWW-Authenticate header). Returns the oauth_problem code if present.
+ */
+async function yahooProblem(res: Response, fallback: string) {
+  const text = await res.text().catch(() => "");
+  let desc = "";
+  try {
+    const j = JSON.parse(text) as { error?: { description?: string } | string; description?: string };
+    desc = (typeof j.error === "object" ? j.error?.description : j.error) ?? j.description ?? "";
+  } catch {
+    desc = text.match(/<description>([^<]+)</)?.[1] ?? text.slice(0, 200);
+  }
+  const problem = `${desc} ${res.headers.get("www-authenticate") ?? ""}`.match(/oauth_problem="?([A-Za-z_]+)/)?.[1];
+  return (problem || desc.trim() || fallback).slice(0, 200);
+}
 
 /** A Yahoo Fantasy API call failed; `message` includes Yahoo's description. */
 export class YahooApiError extends Error {}
@@ -129,26 +148,16 @@ export class YahooTokenError extends Error {}
  */
 export async function yahooGet(path: string, session: YahooSession, origin: string) {
   let s = session;
-  if (Date.now() >= s.expiresAt) s = await refresh(s, origin).catch(() => Promise.reject(new YahooAuthError("Yahoo session expired")));
+  if (Date.now() >= s.expiresAt) s = await refresh(s, origin).catch(() => Promise.reject(new YahooAuthError("token_expired")));
   const call = (token: string) =>
     fetch(`${API}${path}${path.includes("?") ? "&" : "?"}format=json`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
   let res = await call(s.accessToken);
   if (res.status === 401) {
-    s = await refresh(s, origin).catch(() => Promise.reject(new YahooAuthError("Yahoo session expired")));
+    s = await refresh(s, origin).catch(() => Promise.reject(new YahooAuthError("token_expired")));
     res = await call(s.accessToken);
   }
-  if (res.status === 401) {
-    // Usually the token works but the Yahoo app lacks the Fantasy Sports permission.
-    const text = await res.text().catch(() => "");
-    const desc = text.match(/"description"\s*:\s*"([^"]+)"/)?.[1] ?? text.match(/<description>([^<]+)</)?.[1] ?? text.match(/oauth_problem="?([a-z_]+)/)?.[1] ?? "";
-    throw new YahooAuthError(desc.slice(0, 200) || "Yahoo rejected the sign-in token");
-  }
-  if (!res.ok) {
-    // Yahoo's error body says what's wrong (e.g. a bad resource path); safe to show.
-    const text = await res.text().catch(() => "");
-    const desc = text.match(/"description"\s*:\s*"([^"]+)"/)?.[1] ?? text.match(/<description>([^<]+)</)?.[1] ?? "";
-    throw new YahooApiError(`Yahoo API ${res.status}${desc ? `: ${desc.slice(0, 160)}` : ""}`);
-  }
+  if (res.status === 401) throw new YahooAuthError(await yahooProblem(res, "token_rejected"));
+  if (!res.ok) throw new YahooApiError(`Yahoo API ${res.status}: ${await yahooProblem(res, "unknown")}`);
   return { json: (await res.json()) as unknown, session: s, refreshed: s !== session };
 }
 
@@ -164,4 +173,15 @@ export async function writeSession(s: YahooSession | null) {
   const jar = await cookies();
   if (s) jar.set(SESSION_COOKIE, sealSession(s), sessionCookieOptions);
   else jar.delete(SESSION_COOKIE);
+}
+
+/** Plain-English explanation for a Yahoo oauth_problem code. */
+export function yahooAuthHelp(problem: string) {
+  const fix: Record<string, string> = {
+    token_rejected:
+      "Yahoo signed you in but won't let this app read fantasy data. In your Yahoo app (developer.yahoo.com/apps → your app → Edit), turn on API Permissions → Fantasy Sports → Read and save. Then sign out here and sign in with Yahoo again.",
+    token_expired: "Your Yahoo sign-in expired. Please sign in again.",
+    unable_to_determine_oauth_type: "The site sent Yahoo a malformed request. Please sign in again; if it repeats, this is a bug on our side.",
+  };
+  return `${fix[problem] ?? "Yahoo wouldn't share your fantasy data. Check that your Yahoo app has Fantasy Sports → Read permission, then sign in again."} (${problem})`;
 }
