@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "My Team" };
 const playerId = (v: unknown) => (typeof v === "string" && /^[A-Za-z0-9]{1,12}$/.test(v) ? v : null);
 
 export default async function MyTeamPage({ searchParams }: PageProps<"/my-team">) {
-  const [{ yahoo, detail, away, want }, scoring] = await Promise.all([searchParams, getScoring()]);
+  const [{ yahoo, google, detail, away, want }, scoring] = await Promise.all([searchParams, getScoring()]);
   const board = await getValueBoard(scoring);
   // ?away=ID / ?want=ID open the trade finder pre-filled (links from player pages).
   const awayId = playerId(away);
@@ -19,6 +19,7 @@ export default async function MyTeamPage({ searchParams }: PageProps<"/my-team">
       players={board.players}
       scoring={scoring}
       yahooStatus={typeof yahoo === "string" ? yahoo : null}
+      googleStatus={typeof google === "string" ? google : null}
       yahooDetail={typeof detail === "string" ? detail.slice(0, 60) : null}
       finderPreset={finderPreset}
     />

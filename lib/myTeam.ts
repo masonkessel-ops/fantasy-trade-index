@@ -83,14 +83,31 @@ function parse(raw: string | null): SavedTeam | null {
   return cachedTeam;
 }
 
-export function saveTeam(team: SavedTeam | null) {
+/** Listeners told about user edits (the account sync uses this to save to the cloud). */
+const editListeners = new Set<(team: SavedTeam | null) => void>();
+export function onTeamEdited(fn: (team: SavedTeam | null) => void) {
+  editListeners.add(fn);
+  return () => editListeners.delete(fn);
+}
+
+export function readSavedTeam(): SavedTeam | null {
+  return parse(read());
+}
+
+/**
+ * Save the team in this browser. `fromCloud` = this copy came from the user's
+ * account, so don't echo it back to the server.
+ */
+export function saveTeam(team: SavedTeam | null, opts: { fromCloud?: boolean } = {}) {
+  const stamped = team ? { ...team, updatedAt: opts.fromCloud ? team.updatedAt : Date.now() } : null;
   try {
-    if (team) localStorage.setItem(KEY, JSON.stringify({ ...team, updatedAt: Date.now() }));
+    if (stamped) localStorage.setItem(KEY, JSON.stringify(stamped));
     else localStorage.removeItem(KEY);
   } catch {
     /* storage unavailable (private mode) — nothing to do */
   }
   window.dispatchEvent(new Event(EVENT));
+  if (!opts.fromCloud) editListeners.forEach((fn) => fn(stamped));
 }
 
 /** Returns [team, setTeam, hydrated]. `hydrated` is false during SSR / first paint. */

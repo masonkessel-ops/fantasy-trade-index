@@ -20,6 +20,7 @@ import clsx from "clsx";
 import { LogoMark, Wordmark } from "./Logo";
 import { ScoringToggle } from "./ScoringToggle";
 import { YahooAccount } from "./YahooAccount";
+import { AccountButton } from "./AccountButton";
 import type { Scoring } from "@/lib/types";
 
 type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
@@ -80,6 +81,7 @@ export function Nav({ scoring }: { scoring: Scoring }) {
           })}
         </nav>
         <div className="mt-auto space-y-4 px-2">
+          <AccountButton />
           <YahooAccount />
           <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-faint">Scoring</p>
@@ -156,7 +158,8 @@ export function Nav({ scoring }: { scoring: Scoring }) {
                   <X className="size-5" />
                 </button>
               </div>
-              <div className="mb-3">
+              <div className="mb-3 space-y-2">
+                <AccountButton />
                 <YahooAccount />
               </div>
               <div className="grid grid-cols-2 gap-2">

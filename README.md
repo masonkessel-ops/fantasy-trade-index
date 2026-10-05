@@ -14,7 +14,7 @@ Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**
 | **AI Assistant** (`/assistant`) | Chat with Claude about trades. It gets your roster, league scoring and live trade values, streams its answer, and returns 2–3 trade ideas as cards that open in the analyzer |
 | **Live Tracker** (`/live`) | Refreshes every 60s: top scorers by position, booms and busts vs. projection, and a scoreboard with each game's top fantasy performers |
 | **Team of the Week** (`/team-of-the-week`) | The highest-scoring possible lineup (QB, 2 RB, 2 WR, TE, FLEX, K, DST) on a football-field graphic, with a week picker |
-| **My Team** (`/my-team`) | Import your team from **Sleeper**, **Yahoo** (sign in), **ESPN** (league ID; private leagues via cookies), a **screenshot** of any fantasy app (read by Claude), **pasted** roster text, or build one by hand. Includes a **Trade finder**: pick players to trade away and see what you could get, or pick a player you want and see what to offer. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
+| **My Team** (`/my-team`) | Starting lineup and bench with this week's points (tap a player for their card and a **Trade away** shortcut). Sign in with Google to save your team. Import from **Sleeper**, **Yahoo** (sign in), **ESPN** (league ID; private leagues via cookies), a **screenshot** of any fantasy app (read by Claude), **pasted** roster text, or build one by hand. Includes a **Trade finder**: pick players to trade away and see what you could get, or pick a player you want and see what to offer. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
 
 PPR, Half-PPR and Standard scoring are supported everywhere (toggle in the sidebar or header). Importing a Sleeper league switches to that league's format.
 
@@ -68,6 +68,15 @@ On **My Team**, [`lib/advice.ts`](lib/advice.ts) builds:
 - **Trades you should make:** every 1-for-1, 2-for-1 and 1-for-2 deal with each team in your league that's fair by trade value, raises your starting-lineup value, and doesn't gut theirs. All of this is pure math, so it's free to run.
 
 The thresholds (`MIN_LINEUP_GAIN`, `MAX_PARTNER_LOSS`, `MIN_PICKUP_GAIN`…) are at the top of that file.
+
+## Accounts: Sign in with Google (optional)
+
+People can sign in with Google to save their team to an account and open it on any device. While signed in, edits save automatically, and the newer copy (this browser's or the account's) wins when you sign in. Code: [`lib/auth.ts`](lib/auth.ts), [`lib/store.ts`](lib/store.ts), [`lib/account.ts`](lib/account.ts), `app/api/auth/*`, `app/api/me/*`.
+
+Setup (two free services):
+1. **Database:** in Vercel → your project → **Storage** → **Create Database** → **Upstash for Redis** (free plan) → connect it to the project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically.
+2. **Google sign-in:** at [console.cloud.google.com](https://console.cloud.google.com), create a project, open **Google Auth Platform** and fill in the app name and support email (Audience: External). Then go to **Clients → Create client → Web application** and add the redirect URI `https://YOUR-SITE.vercel.app/api/auth/google/callback`. Put the Client ID and secret in Vercel as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (`SESSION_SECRET` must also be set). Under **Audience**, click **Publish app** so anyone can sign in. It only asks for name/email/photo, so Google doesn't require a review.
+3. Redeploy. A "Sign in with Google" button appears in the sidebar and on My Team.
 
 ## Importing from a photo or pasted text
 

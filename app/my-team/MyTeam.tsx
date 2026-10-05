@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import clsx from "clsx";
 import { PageHeader } from "@/components/PageHeader";
 import { useMyTeam } from "@/lib/myTeam";
+import { SaveCallout } from "./SaveCallout";
 import type { PlayerValue, Scoring } from "@/lib/types";
 import { TeamDashboard } from "./TeamDashboard";
 import { TeamSetup } from "./TeamSetup";
@@ -14,6 +15,13 @@ const YAHOO_MESSAGES: Record<string, { text: string; ok: boolean }> = {
   denied: { text: "Yahoo sign-in was cancelled.", ok: false },
   error: { text: "Yahoo sign-in didn't work. Please try again.", ok: false },
   not_configured: { text: "Yahoo sign-in isn't set up on this site yet.", ok: false },
+};
+
+const GOOGLE_MESSAGES: Record<string, { text: string; ok: boolean }> = {
+  signed_in: { text: "Signed in with Google. Your team is now saved to your account.", ok: true },
+  denied: { text: "Google sign-in was cancelled.", ok: false },
+  error: { text: "Google sign-in didn't work. Please try again.", ok: false },
+  not_configured: { text: "Google sign-in isn't set up on this site yet.", ok: false },
 };
 
 const DETAIL_HELP: Record<string, string> = {
@@ -30,23 +38,25 @@ export function MyTeam({
   players,
   scoring,
   yahooStatus,
+  googleStatus = null,
   yahooDetail = null,
   finderPreset = null,
 }: {
   players: PlayerValue[];
   scoring: Scoring;
   yahooStatus: string | null;
+  googleStatus?: string | null;
   yahooDetail?: string | null;
   finderPreset?: { mode: "away" | "for"; ids: string[] } | null;
 }) {
   const [team, setTeam, hydrated] = useMyTeam();
-  const [notice, setNotice] = useState(yahooStatus ? YAHOO_MESSAGES[yahooStatus] : undefined);
+  const [notice, setNotice] = useState(googleStatus ? GOOGLE_MESSAGES[googleStatus] : yahooStatus ? YAHOO_MESSAGES[yahooStatus] : undefined);
 
   const banner = notice && (
     <div className={clsx("mb-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm", notice.ok ? "bg-up/10 text-up" : "bg-flame/10 text-flame")}>
       <span>
         {notice.text}
-        {notice.ok && team && " To switch to it, click Reset on your current team first."}
+        {notice.ok && team && yahooStatus && " To switch to it, click Reset on your current team first."}
         {!notice.ok && yahooDetail && (
           <span className="mt-1 block text-xs opacity-90">
             {DETAIL_HELP[yahooDetail] ?? "Yahoo said:"} <code className="opacity-70">({yahooDetail})</code>
@@ -81,6 +91,7 @@ export function MyTeam({
           subtitle="Import your team from Sleeper, Yahoo or ESPN, or build one by hand. You'll get its trade value, start/sit advice, waiver pickups and trades you should make."
         />
         {banner}
+        <SaveCallout />
         <TeamSetup players={players} scoring={scoring} onDone={setTeam} initialMode={yahooStatus === "connected" ? "yahoo" : "sleeper"} />
       </>
     );
@@ -89,6 +100,7 @@ export function MyTeam({
   return (
     <>
       {banner}
+      <SaveCallout />
       <TeamDashboard team={team} players={players} scoring={scoring} onChange={setTeam} finderPreset={finderPreset} />
     </>
   );
