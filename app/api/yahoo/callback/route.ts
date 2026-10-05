@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     return r;
   };
   if (!yahooConfigured()) return fail("not_configured");
-  if (req.nextUrl.searchParams.get("error")) return fail("denied");
+  const yahooError = req.nextUrl.searchParams.get("error");
+  if (yahooError) return yahooError === "access_denied" ? fail("denied") : fail("error", yahooError.slice(0, 60));
   if (!code) return fail("error", "no_code");
   if (!expected) return fail("error", "state_cookie_missing");
   if (state !== expected) return fail("error", "state_mismatch");

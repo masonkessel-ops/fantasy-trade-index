@@ -35,11 +35,20 @@ export function redirectUri(origin: string) {
   return env("YAHOO_REDIRECT_URI") || `${origin}/api/yahoo/callback`;
 }
 
+/**
+ * OAuth scope to request. Yahoo only grants Fantasy Sports access when it's
+ * asked for explicitly (otherwise the API answers additional_authorization_required).
+ * fspt-r = Fantasy Sports read. Override with YAHOO_SCOPE (e.g. "fspt-w") if your
+ * Yahoo app was registered with read/write.
+ */
+const scope = () => env("YAHOO_SCOPE") || "fspt-r";
+
 export function authorizeUrl(origin: string, state: string) {
   const q = new URLSearchParams({
     client_id: clientId(),
     redirect_uri: redirectUri(origin),
     response_type: "code",
+    scope: scope(),
     language: "en-us",
     state,
   });
@@ -178,6 +187,8 @@ export async function writeSession(s: YahooSession | null) {
 /** Plain-English explanation for a Yahoo oauth_problem code. */
 export function yahooAuthHelp(problem: string) {
   const fix: Record<string, string> = {
+    additional_authorization_required:
+      "Your Yahoo sign-in doesn't include Fantasy Sports access. Click Sign out, then Sign in with Yahoo again; the site now asks Yahoo for fantasy access explicitly.",
     token_rejected:
       "Yahoo signed you in but won't let this app read fantasy data. In your Yahoo app (developer.yahoo.com/apps → your app → Edit), turn on API Permissions → Fantasy Sports → Read and save. Then sign out here and sign in with Yahoo again.",
     token_expired: "Your Yahoo sign-in expired. Please sign in again.",

@@ -20,6 +20,8 @@ const DETAIL_HELP: Record<string, string> = {
   invalid_client: "Yahoo rejected the app keys. Check that YAHOO_CLIENT_ID is the Consumer Key and YAHOO_CLIENT_SECRET is the Consumer Secret in Vercel, then redeploy.",
   invalid_grant: "Yahoo rejected the sign-in code. Try once more; if it repeats, check that your Yahoo app's Redirect URI is exactly https://fantasy-trade-index.vercel.app/api/yahoo/callback.",
   redirect_uri_mismatch: "In your Yahoo app, the Redirect URI must be exactly https://fantasy-trade-index.vercel.app/api/yahoo/callback.",
+  invalid_scope:
+    "Yahoo says your app isn't allowed Fantasy Sports access. At developer.yahoo.com/apps → your app, turn on API Permissions → Fantasy Sports → Read, save, then try again.",
   state_cookie_missing: "Your browser blocked the sign-in cookie. Try again, and make sure cookies are allowed for this site.",
   state_mismatch: "The sign-in took too long or was started twice. Please try again.",
 };
