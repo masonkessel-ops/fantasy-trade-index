@@ -86,3 +86,38 @@ export interface ValueBoard {
   generatedAt: number;
   players: PlayerValue[];
 }
+
+export type LeagueProvider = "sleeper" | "espn" | "yahoo";
+
+/** One team in an imported league. Player IDs are always Sleeper IDs. */
+export interface LeagueTeam {
+  rosterId: number;
+  ownerId: string | null;
+  displayName: string;
+  teamName: string;
+  avatar: string | null;
+  wins: number;
+  losses: number;
+  ties: number;
+  pointsFor: number;
+  players: string[];
+  starters: string[];
+}
+
+/** A league from any platform, normalised to Sleeper-style slots and IDs. */
+export interface LeagueDetail {
+  leagueId: string;
+  name: string;
+  season: string;
+  totalRosters: number;
+  avatar: string | null;
+  /** Sleeper slot names: QB, RB, WR, TE, FLEX, SUPER_FLEX, WRRB_FLEX, REC_FLEX, K, DEF, BN, IR */
+  rosterPositions: string[];
+  scoringSettings: Record<string, number>;
+  teams: LeagueTeam[];
+  provider?: LeagueProvider;
+  /** rosterId of the signed-in user's team, when the platform tells us */
+  myRosterId?: number | null;
+  /** how many rostered players couldn't be matched to our player database */
+  unmatched?: number;
+}

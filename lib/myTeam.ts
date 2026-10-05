@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { Scoring } from "./types";
+import type { LeagueProvider, Scoring } from "./types";
 
 /**
  * The user's team lives in localStorage (no accounts needed). Other features
@@ -22,7 +22,7 @@ export interface SavedLeagueTeam {
 }
 
 export interface SavedTeam {
-  source: "sleeper" | "manual";
+  source: LeagueProvider | "manual";
   name: string;
   avatar: string | null;
   scoring: Scoring;
@@ -38,6 +38,7 @@ export interface SavedTeam {
     teams: SavedLeagueTeam[];
     myRosterId: number;
     username: string;
+    provider?: LeagueProvider;
   };
   /** id -> basic info for rostered players who aren't on the value chart */
   directory: Record<string, { name: string; position: string; team: string | null }>;

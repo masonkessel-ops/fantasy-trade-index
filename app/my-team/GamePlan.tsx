@@ -112,8 +112,8 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
                 </motion.li>
               ))}
             </ul>
-          ) : team.source === "sleeper" ? (
-            <p className="mb-4 rounded-xl bg-white/[0.04] px-3 py-2.5 text-sm text-muted">✅ Your Sleeper lineup is already optimal.</p>
+          ) : team.source !== "manual" ? (
+            <p className="mb-4 rounded-xl bg-white/[0.04] px-3 py-2.5 text-sm text-muted">✅ Your current lineup is already optimal.</p>
           ) : null}
           <ul className="space-y-1">
             {advice.lineup.map((l, i) => {

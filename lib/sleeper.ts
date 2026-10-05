@@ -1,7 +1,8 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { memo } from "./memo";
-import type { NflState, Player, Position, ScheduleGame, WeekLine } from "./types";
+import type { LeagueDetail, NflState, Player, Position, ScheduleGame, WeekLine } from "./types";
+export type { LeagueDetail, LeagueTeam } from "./types";
 
 /**
  * Every call to Sleeper goes through this file.
@@ -215,31 +216,6 @@ export interface SleeperLeagueSummary {
   totalRosters: number;
   avatar: string | null;
   scoringRec: number;
-}
-
-export interface LeagueTeam {
-  rosterId: number;
-  ownerId: string | null;
-  displayName: string;
-  teamName: string;
-  avatar: string | null;
-  wins: number;
-  losses: number;
-  ties: number;
-  pointsFor: number;
-  players: string[];
-  starters: string[];
-}
-
-export interface LeagueDetail {
-  leagueId: string;
-  name: string;
-  season: string;
-  totalRosters: number;
-  avatar: string | null;
-  rosterPositions: string[];
-  scoringSettings: Record<string, number>;
-  teams: LeagueTeam[];
 }
 
 const avatarUrl = (id: string | null | undefined) =>

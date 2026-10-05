@@ -14,7 +14,7 @@ Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**
 | **AI Assistant** (`/assistant`) | Chat with Claude about trades. It gets your roster, league scoring and live trade values, streams its answer, and returns 2–3 trade ideas as cards that open in the analyzer |
 | **Live Tracker** (`/live`) | Refreshes every 60s: top scorers by position, booms and busts vs. projection, and a scoreboard with each game's top fantasy performers |
 | **Team of the Week** (`/team-of-the-week`) | The highest-scoring possible lineup (QB, 2 RB, 2 WR, TE, FLEX, K, DST) on a football-field graphic, with a week picker |
-| **My Team** (`/my-team`) | Import your team from Sleeper (username, then league) or build one by hand. Shows total value, best lineup, position grades, strongest/weakest spots and league power rankings |
+| **My Team** (`/my-team`) | Import your team from **Sleeper**, **Yahoo** (sign in) or **ESPN** (league ID; private leagues via cookies), or build one by hand. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
 
 PPR, Half-PPR and Standard scoring are supported everywhere (toggle in the sidebar or header). Importing a Sleeper league switches to that league's format.
 
@@ -54,6 +54,38 @@ Related settings:
 - Trade verdict thresholds and the multi-player package discount: [`lib/tradeAnalysis.ts`](lib/tradeAnalysis.ts)
 - Boom/bust thresholds: [`lib/live.ts`](lib/live.ts)
 - Position-strength grades on My Team: [`lib/teamAnalysis.ts`](lib/teamAnalysis.ts)
+
+## Game plan (recommendations)
+
+On **My Team**, [`lib/advice.ts`](lib/advice.ts) builds:
+
+- **Start / sit:** the best lineup for the coming week from Sleeper projections. It zeroes out players who are Out/IR, discounts Doubtful ones, and knows about byes. Swaps are compared against the lineup currently set in your league. Once most of a week's games are done, it plans for the next week.
+- **Waiver pickups:** free agents in your league (anyone not on a roster) who would start for you or clearly beat your worst bench player. It never suggests dropping a starter or an injured player you're stashing.
+- **Trades you should make:** every 1-for-1, 2-for-1 and 1-for-2 deal with each team in your league that's fair by trade value, raises your starting-lineup value, and doesn't gut theirs. All of this is pure math, so it's free to run.
+
+The thresholds (`MIN_LINEUP_GAIN`, `MAX_PARTNER_LOSS`, `MIN_PICKUP_GAIN`…) are at the top of that file.
+
+## Importing from Yahoo and ESPN
+
+All imported players are matched to Sleeper player IDs by name, position and NFL team ([`lib/playerMatch.ts`](lib/playerMatch.ts)). A few deep-bench players occasionally don't match; the import tells you how many.
+
+### Yahoo sign-in (optional, needs a free Yahoo developer app)
+
+1. Go to [developer.yahoo.com/apps/create](https://developer.yahoo.com/apps/create/) and create an app:
+   - **Application Type:** Web Application
+   - **Redirect URI(s):** `https://YOUR-SITE.vercel.app/api/yahoo/callback` (Yahoo requires https, so set this up on your Vercel deployment)
+   - **API Permissions:** Fantasy Sports → **Read**. Optionally, OpenID Connect → Profile, so the site can show your name.
+2. Copy the **Client ID** and **Client Secret**.
+3. In Vercel → Settings → Environment Variables, add `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, and `SESSION_SECRET` (any long random string, e.g. from `openssl rand -base64 32`). Redeploy.
+
+A "Sign in with Yahoo" button then appears in the sidebar and on My Team. Yahoo tokens are kept in an encrypted, httpOnly cookie in the user's own browser. There's no database, and signing out deletes the cookie. Code: [`lib/yahoo.ts`](lib/yahoo.ts), [`lib/yahooParse.ts`](lib/yahooParse.ts), `app/api/yahoo/*`.
+
+### ESPN
+
+ESPN has no official API, so the site uses the same endpoint ESPN's own website does ([`lib/espn.ts`](lib/espn.ts)), which could change without notice.
+
+- **Public leagues:** paste the league ID or league URL.
+- **Private leagues:** the user also pastes their `espn_s2` and `SWID` cookies (instructions are shown in the app). These are sent to ESPN once for that import, in the request body (never the URL), and are never stored.
 
 ## How data and caching work
 

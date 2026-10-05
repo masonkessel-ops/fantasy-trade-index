@@ -14,8 +14,11 @@ import type { SavedTeam } from "@/lib/myTeam";
 import { SLOT_LABEL, analyzeTeam, gradeColor } from "@/lib/teamAnalysis";
 import { POS_COLOR } from "@/lib/ui";
 import { SCORINGS, type PlayerValue, type Position, type Scoring } from "@/lib/types";
-import { Avatar, fetchLeague, teamFromLeague } from "./TeamSetup";
+import { Avatar } from "./TeamSetup";
+import { LeagueError, refetchLeague, teamFromLeague } from "./leagueClient";
 import { GamePlan } from "./GamePlan";
+
+const PROVIDER_LABEL: Record<string, string> = { sleeper: "Sleeper", espn: "ESPN", yahoo: "Yahoo" };
 
 export function TeamDashboard({
   team,
@@ -51,17 +54,19 @@ export function TeamDashboard({
   const myRank = power.findIndex((p) => p.team.rosterId === team.league?.myRosterId) + 1;
 
   const scoringLabel = (s: Scoring) => SCORINGS.find((x) => x.id === s)!.label;
-  const mismatch = team.source === "sleeper" && team.scoring !== scoring;
+  const mismatch = team.source !== "manual" && team.scoring !== scoring;
 
   async function refresh() {
     if (!team.league) return;
     setRefreshing(true);
     setError(null);
     try {
-      const data = await fetchLeague(team.league.leagueId);
+      const data = await refetchLeague(team);
       onChange(teamFromLeague(data, team.league.myRosterId, team.league.username));
     } catch (e) {
-      setError((e as Error).message);
+      if (e instanceof LeagueError && e.needsCookies) setError("This is a private ESPN league. To refresh it, click Reset and import it again with your ESPN cookies.");
+      else if (e instanceof LeagueError && e.signedOut) setError("Your Yahoo sign-in expired. Click Reset, then sign in with Yahoo again.");
+      else setError((e as Error).message);
     } finally {
       setRefreshing(false);
     }
@@ -87,7 +92,7 @@ export function TeamDashboard({
           <Avatar src={team.avatar ?? team.league?.avatar ?? null} label={team.name} size={60} />
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-rocket">
-              {team.league ? team.league.name : "Custom roster"} · {scoringLabel(team.scoring)}
+              {team.league ? `${PROVIDER_LABEL[team.source] ?? ""} · ${team.league.name}` : "Custom roster"} · {scoringLabel(team.scoring)}
             </p>
             <h1 className="truncate font-display text-4xl font-extrabold uppercase italic leading-none sm:text-5xl">{team.name}</h1>
             {record && (
@@ -124,7 +129,7 @@ export function TeamDashboard({
           )}
           <button
             onClick={() => {
-              if (confirm("Remove this team from Fantasy Trade Index? (Your Sleeper league is not affected.)")) onChange(null);
+              if (confirm("Remove this team from Fantasy Trade Index? (Your league itself is not affected.)")) onChange(null);
             }}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:border-down/40 hover:text-down"
           >

@@ -19,6 +19,7 @@ import {
 import clsx from "clsx";
 import { LogoMark, Wordmark } from "./Logo";
 import { ScoringToggle } from "./ScoringToggle";
+import { YahooAccount } from "./YahooAccount";
 import type { Scoring } from "@/lib/types";
 
 type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
@@ -78,10 +79,13 @@ export function Nav({ scoring }: { scoring: Scoring }) {
             );
           })}
         </nav>
-        <div className="mt-auto px-2">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-faint">Scoring</p>
-          <ScoringToggle scoring={scoring} />
-          <p className="mt-4 text-[11px] leading-relaxed text-faint">Data via Sleeper. Values update every few minutes.</p>
+        <div className="mt-auto space-y-4 px-2">
+          <YahooAccount />
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-faint">Scoring</p>
+            <ScoringToggle scoring={scoring} />
+            <p className="mt-4 text-[11px] leading-relaxed text-faint">Data via Sleeper. Values update every few minutes.</p>
+          </div>
         </div>
       </aside>
 
@@ -151,6 +155,9 @@ export function Nav({ scoring }: { scoring: Scoring }) {
                 <button onClick={() => setOpen(false)} className="rounded-full p-2 text-muted hover:text-ink" aria-label="Close menu">
                   <X className="size-5" />
                 </button>
+              </div>
+              <div className="mb-3">
+                <YahooAccount />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {NAV.map((item) => (

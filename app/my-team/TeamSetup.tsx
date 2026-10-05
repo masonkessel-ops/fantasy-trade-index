@@ -1,103 +1,79 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import clsx from "clsx";
-import { ArrowRight, ChevronLeft, Download, Hammer, Loader2, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, Hammer, Loader2, LogOut, Trash2 } from "lucide-react";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { ScoringToggle, setScoringCookie } from "@/components/ScoringToggle";
-import { DEFAULT_ROSTER_POSITIONS, scoringFromRec, type SavedLeagueTeam, type SavedTeam } from "@/lib/myTeam";
+import { DEFAULT_ROSTER_POSITIONS, scoringFromRec, type SavedTeam } from "@/lib/myTeam";
 import { SCORINGS, type PlayerValue, type Scoring } from "@/lib/types";
+import { LeagueError, fetchEspnLeague, fetchSleeperLeague, fetchYahooLeague, teamFromLeague, type LeagueResponse } from "./leagueClient";
 
-type LeagueSummary = { leagueId: string; name: string; totalRosters: number; avatar: string | null; scoringRec: number };
-type LeagueResponse = {
-  league: {
-    leagueId: string;
-    name: string;
-    season: string;
-    totalRosters: number;
-    avatar: string | null;
-    rosterPositions: string[];
-    scoringSettings: Record<string, number>;
-    teams: SavedLeagueTeam[];
-  };
-  directory: SavedTeam["directory"];
-};
+type Mode = "sleeper" | "yahoo" | "espn" | "manual";
 
-export async function fetchLeague(leagueId: string): Promise<LeagueResponse> {
-  const res = await fetch(`/api/sleeper/league/${leagueId}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Couldn't load that league.");
-  return data;
-}
+const TABS: { id: Mode; label: string; short: string }[] = [
+  { id: "sleeper", label: "Sleeper", short: "Sleeper" },
+  { id: "yahoo", label: "Yahoo", short: "Yahoo" },
+  { id: "espn", label: "ESPN", short: "ESPN" },
+  { id: "manual", label: "Build manually", short: "Manual" },
+];
 
-export function teamFromLeague(data: LeagueResponse, rosterId: number, username: string): SavedTeam {
-  const { league, directory } = data;
-  const mine = league.teams.find((t) => t.rosterId === rosterId)!;
-  return {
-    source: "sleeper",
-    name: mine.teamName,
-    avatar: mine.avatar,
-    scoring: scoringFromRec(league.scoringSettings.rec),
-    playerIds: mine.players,
-    rosterPositions: league.rosterPositions,
-    league: { ...league, myRosterId: rosterId, username },
-    directory,
-    updatedAt: Date.now(),
-  };
-}
+const inputCls =
+  "h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface-2 px-4 text-sm outline-none transition placeholder:text-faint focus:border-rocket/50 focus:ring-4 focus:ring-rocket/10";
+const primaryBtn =
+  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rocket to-flame px-5 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-50";
 
 export function TeamSetup({
   players,
   scoring,
   onDone,
+  initialMode = "sleeper",
 }: {
   players: PlayerValue[];
   scoring: Scoring;
   onDone: (t: SavedTeam) => void;
+  initialMode?: Mode;
 }) {
-  const [mode, setMode] = useState<"sleeper" | "manual">("sleeper");
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const router = useRouter();
+  const finish = (data: LeagueResponse, rosterId: number, username?: string) => {
+    const team = teamFromLeague(data, rosterId, username);
+    setScoringCookie(team.scoring);
+    onDone(team);
+    router.refresh();
+  };
+
   return (
     <div className="card animate-rise overflow-hidden [animation-delay:80ms]">
-      <div className="grid grid-cols-2 border-b border-line p-1.5">
-        {(
-          [
-            { id: "sleeper", label: "Import from Sleeper", icon: Download },
-            { id: "manual", label: "Build manually", icon: Hammer },
-          ] as const
-        ).map((t) => (
+      <div className="grid grid-cols-4 border-b border-line p-1.5">
+        {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setMode(t.id)}
             className={clsx(
-              "relative flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-colors",
+              "relative flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold transition-colors",
               mode === t.id ? "text-ink" : "text-muted hover:text-ink",
             )}
           >
             {mode === t.id && (
               <motion.span layoutId="setup-tab" className="absolute inset-0 rounded-xl bg-surface-3" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
             )}
-            <t.icon className="relative size-4" />
-            <span className="relative">{t.label}</span>
+            {t.id === "manual" && <Hammer className="relative size-4" />}
+            <span className="relative hidden sm:inline">{t.label}</span>
+            <span className="relative sm:hidden">{t.short}</span>
           </button>
         ))}
       </div>
       <div className="p-5 sm:p-7">
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={mode}
-            initial={{ opacity: 0, x: mode === "manual" ? 16 : -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
-            {mode === "sleeper" ? (
-              <SleeperImport onDone={onDone} />
-            ) : (
-              <ManualBuilder players={players} scoring={scoring} onDone={onDone} />
-            )}
+          <motion.div key={mode} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+            {mode === "sleeper" && <SleeperImport onFinish={finish} />}
+            {mode === "yahoo" && <YahooImport onFinish={finish} />}
+            {mode === "espn" && <EspnImport onFinish={finish} />}
+            {mode === "manual" && <ManualBuilder players={players} scoring={scoring} onDone={onDone} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -105,13 +81,80 @@ export function TeamSetup({
   );
 }
 
-function SleeperImport({ onDone }: { onDone: (t: SavedTeam) => void }) {
-  const router = useRouter();
+type Finish = (data: LeagueResponse, rosterId: number, username?: string) => void;
+
+/** "Which team is yours?" when the platform didn't tell us. */
+function TeamPicker({ data, onPick, onBack, reason }: { data: LeagueResponse; onPick: (rosterId: number) => void; onBack: () => void; reason: string }) {
+  return (
+    <div>
+      <button onClick={onBack} className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
+        <ChevronLeft className="size-4" /> Back
+      </button>
+      <h3 className="font-display text-2xl font-bold uppercase">Which team is yours?</h3>
+      <p className="mb-4 text-sm text-muted">{reason}</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {data.league.teams.map((t) => (
+          <button
+            key={t.rosterId}
+            onClick={() => onPick(t.rosterId)}
+            className="flex items-center gap-3 rounded-2xl border border-line bg-surface-2 p-3 text-left transition hover:border-rocket/40"
+          >
+            <Avatar src={t.avatar} label={t.teamName} />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{t.teamName}</span>
+              <span className="text-xs text-muted">
+                {t.displayName} · {t.wins}-{t.losses}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UnmatchedNote({ data }: { data: LeagueResponse }) {
+  if (!data.league.unmatched) return null;
+  return (
+    <p className="mb-3 rounded-xl bg-flame/10 px-3 py-2 text-xs text-flame">
+      {data.league.unmatched} rostered player{data.league.unmatched > 1 ? "s" : ""} (mostly deep bench or free agents) couldn&apos;t be matched and
+      will be left out.
+    </p>
+  );
+}
+
+function LeagueButton({ name, sub, avatar, busy, disabled, onClick, i }: { name: string; sub: string; avatar: string | null; busy: boolean; disabled: boolean; onClick: () => void; i: number }) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: i * 0.05 }}
+      onClick={onClick}
+      disabled={disabled}
+      className="group flex items-center gap-3 rounded-2xl border border-line bg-surface-2 p-3 text-left transition hover:border-rocket/40 disabled:opacity-60"
+    >
+      <Avatar src={avatar} label={name} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{name}</span>
+        <span className="text-xs text-muted">{sub}</span>
+      </span>
+      {busy ? <Loader2 className="size-4 animate-spin text-rocket" /> : <ArrowRight className="size-4 text-faint transition group-hover:translate-x-0.5 group-hover:text-rocket" />}
+    </motion.button>
+  );
+}
+
+const ErrorNote = ({ error }: { error: string | null }) => (error ? <p className="mt-3 rounded-xl bg-down/10 px-3 py-2 text-sm text-down">{error}</p> : null);
+
+/* --------------------------------------------------------------- Sleeper */
+
+type SleeperLeague = { leagueId: string; name: string; totalRosters: number; avatar: string | null; scoringRec: number };
+
+function SleeperImport({ onFinish }: { onFinish: Finish }) {
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<{ userId: string; displayName: string; username: string } | null>(null);
-  const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
+  const [leagues, setLeagues] = useState<SleeperLeague[]>([]);
   const [picking, setPicking] = useState<LeagueResponse | null>(null);
 
   async function lookup(e: React.FormEvent) {
@@ -134,20 +177,13 @@ function SleeperImport({ onDone }: { onDone: (t: SavedTeam) => void }) {
     }
   }
 
-  function finish(data: LeagueResponse, rosterId: number) {
-    const team = teamFromLeague(data, rosterId, user!.username);
-    setScoringCookie(team.scoring);
-    onDone(team);
-    router.refresh();
-  }
-
-  async function chooseLeague(l: LeagueSummary) {
+  async function chooseLeague(l: SleeperLeague) {
     setBusy(l.leagueId);
     setError(null);
     try {
-      const data = await fetchLeague(l.leagueId);
+      const data = await fetchSleeperLeague(l.leagueId);
       const mine = data.league.teams.find((t) => t.ownerId === user!.userId);
-      if (mine) finish(data, mine.rosterId);
+      if (mine) onFinish(data, mine.rosterId, user!.username);
       else setPicking(data);
     } catch (err) {
       setError((err as Error).message);
@@ -156,85 +192,43 @@ function SleeperImport({ onDone }: { onDone: (t: SavedTeam) => void }) {
     }
   }
 
-  if (picking) {
+  if (picking)
     return (
-      <div>
-        <button onClick={() => setPicking(null)} className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-          <ChevronLeft className="size-4" /> Leagues
-        </button>
-        <h3 className="font-display text-2xl font-bold uppercase">Which team is yours?</h3>
-        <p className="mb-4 text-sm text-muted">We couldn&apos;t match your account to a roster in {picking.league.name}.</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {picking.league.teams.map((t) => (
-            <button
-              key={t.rosterId}
-              onClick={() => finish(picking, t.rosterId)}
-              className="flex items-center gap-3 rounded-2xl border border-line bg-surface-2 p-3 text-left transition hover:border-rocket/40"
-            >
-              <Avatar src={t.avatar} label={t.teamName} />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{t.teamName}</span>
-                <span className="text-xs text-muted">
-                  {t.displayName} · {t.wins}-{t.losses}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <TeamPicker
+        data={picking}
+        onBack={() => setPicking(null)}
+        onPick={(id) => onFinish(picking, id, user!.username)}
+        reason={`We couldn't match your account to a roster in ${picking.league.name}.`}
+      />
     );
-  }
 
   return (
     <div>
-      <h3 className="font-display text-2xl font-bold uppercase">Import your Sleeper league</h3>
-      <p className="mb-4 text-sm text-muted">Enter your Sleeper username. We only read public league data, no login needed.</p>
+      <h3 className="font-display text-2xl font-bold uppercase">Import from Sleeper</h3>
+      <p className="mb-4 text-sm text-muted">Enter your Sleeper username. Sleeper leagues are readable without logging in.</p>
       <form onSubmit={lookup} className="flex gap-2">
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Sleeper username"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          className="h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface-2 px-4 text-sm outline-none transition placeholder:text-faint focus:border-rocket/50 focus:ring-4 focus:ring-rocket/10"
-        />
-        <button
-          disabled={!username.trim() || busy === "user"}
-          className="inline-flex h-12 items-center gap-2 rounded-xl bg-gradient-to-r from-rocket to-flame px-5 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-50"
-        >
+        <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Sleeper username" autoCapitalize="none" autoCorrect="off" spellCheck={false} className={inputCls} />
+        <button disabled={!username.trim() || busy === "user"} className={primaryBtn}>
           {busy === "user" ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
           Find
         </button>
       </form>
-      {error && <p className="mt-3 rounded-xl bg-down/10 px-3 py-2 text-sm text-down">{error}</p>}
+      <ErrorNote error={error} />
       {leagues.length > 0 && (
         <div className="mt-5">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-faint">{user?.displayName}&apos;s leagues</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {leagues.map((l, i) => (
-              <motion.button
+              <LeagueButton
                 key={l.leagueId}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => chooseLeague(l)}
+                i={i}
+                name={l.name}
+                avatar={l.avatar}
+                sub={`${l.totalRosters} teams · ${SCORINGS.find((s) => s.id === scoringFromRec(l.scoringRec))!.label}`}
+                busy={busy === l.leagueId}
                 disabled={!!busy}
-                className="group flex items-center gap-3 rounded-2xl border border-line bg-surface-2 p-3 text-left transition hover:border-rocket/40 disabled:opacity-60"
-              >
-                <Avatar src={l.avatar} label={l.name} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{l.name}</span>
-                  <span className="text-xs text-muted">
-                    {l.totalRosters} teams · {SCORINGS.find((s) => s.id === scoringFromRec(l.scoringRec))!.label}
-                  </span>
-                </span>
-                {busy === l.leagueId ? (
-                  <Loader2 className="size-4 animate-spin text-rocket" />
-                ) : (
-                  <ArrowRight className="size-4 text-faint transition group-hover:translate-x-0.5 group-hover:text-rocket" />
-                )}
-              </motion.button>
+                onClick={() => chooseLeague(l)}
+              />
             ))}
           </div>
         </div>
@@ -242,6 +236,199 @@ function SleeperImport({ onDone }: { onDone: (t: SavedTeam) => void }) {
     </div>
   );
 }
+
+/* ----------------------------------------------------------------- Yahoo */
+
+type YahooLeague = { leagueKey: string; name: string; numTeams: number; season: string; logo: string | null };
+
+function YahooImport({ onFinish }: { onFinish: Finish }) {
+  const [status, setStatus] = useState<{ configured: boolean; signedIn: boolean; name: string | null } | null>(null);
+  const [leagues, setLeagues] = useState<YahooLeague[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [picking, setPicking] = useState<LeagueResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const me = await fetch("/api/yahoo/me").then((r) => r.json()).catch(() => ({ configured: false, signedIn: false, name: null }));
+      if (cancelled) return;
+      setStatus(me);
+      if (!me.signedIn) return;
+      const res = await fetch("/api/yahoo/leagues");
+      const data = await res.json().catch(() => ({}));
+      if (cancelled) return;
+      if (res.ok) setLeagues(data.leagues);
+      else if (data.signedOut) setStatus({ ...me, signedIn: false });
+      else setError(data.error ?? "Couldn't load your Yahoo leagues.");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function chooseLeague(l: YahooLeague) {
+    setBusy(l.leagueKey);
+    setError(null);
+    try {
+      const data = await fetchYahooLeague(l.leagueKey);
+      if (data.league.myRosterId != null) onFinish(data, data.league.myRosterId);
+      else setPicking(data);
+    } catch (err) {
+      if (err instanceof LeagueError && err.signedOut) setStatus((s) => (s ? { ...s, signedIn: false } : s));
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (picking)
+    return <TeamPicker data={picking} onBack={() => setPicking(null)} onPick={(id) => onFinish(picking, id)} reason="Yahoo didn't say which team is yours." />;
+
+  if (!status) return <p className="flex items-center gap-2 text-sm text-muted"><Loader2 className="size-4 animate-spin" /> Checking Yahoo…</p>;
+
+  if (!status.configured)
+    return (
+      <div>
+        <h3 className="font-display text-2xl font-bold uppercase">Import from Yahoo</h3>
+        <p className="mt-2 text-sm text-muted">
+          Yahoo sign-in isn&apos;t switched on for this site yet. The site owner needs to add Yahoo API keys (see the README&apos;s &quot;Yahoo sign-in&quot;
+          section). Until then, you can rebuild your Yahoo roster with <b className="text-ink">Build manually</b>.
+        </p>
+      </div>
+    );
+
+  if (!status.signedIn)
+    return (
+      <div>
+        <h3 className="font-display text-2xl font-bold uppercase">Sign in with Yahoo</h3>
+        <p className="mb-5 mt-1 text-sm text-muted">
+          Sign in to pull in your Yahoo leagues, including private ones. We only ask Yahoo for read access to your fantasy data, and you can disconnect anytime.
+        </p>
+        <a href="/api/yahoo/login" className="inline-flex h-12 items-center gap-2.5 rounded-xl bg-[#6001d2] px-5 text-sm font-bold text-white transition hover:brightness-110">
+          <span className="grid size-6 place-items-center rounded-md bg-white font-display text-base font-extrabold text-[#6001d2]">Y!</span>
+          Sign in with Yahoo
+        </a>
+        <ErrorNote error={error} />
+      </div>
+    );
+
+  return (
+    <div>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display text-2xl font-bold uppercase">Your Yahoo leagues</h3>
+          <p className="text-sm text-muted">Signed in{status.name ? ` as ${status.name}` : ""}.</p>
+        </div>
+        <SignOutYahoo onDone={() => setStatus({ ...status, signedIn: false })} />
+      </div>
+      {!leagues ? (
+        <p className="flex items-center gap-2 text-sm text-muted"><Loader2 className="size-4 animate-spin" /> Loading leagues…</p>
+      ) : leagues.length === 0 ? (
+        <p className="text-sm text-muted">No Yahoo NFL leagues found for this season.</p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {leagues.map((l, i) => (
+            <LeagueButton key={l.leagueKey} i={i} name={l.name} avatar={l.logo} sub={`${l.numTeams} teams · ${l.season}`} busy={busy === l.leagueKey} disabled={!!busy} onClick={() => chooseLeague(l)} />
+          ))}
+        </div>
+      )}
+      <ErrorNote error={error} />
+    </div>
+  );
+}
+
+export function SignOutYahoo({ onDone }: { onDone: () => void }) {
+  return (
+    <button
+      onClick={async () => {
+        await fetch("/api/yahoo/logout", { method: "POST" });
+        onDone();
+      }}
+      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold text-muted transition hover:text-ink"
+    >
+      <LogOut className="size-3.5" /> Sign out
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ ESPN */
+
+function EspnImport({ onFinish }: { onFinish: Finish }) {
+  const [leagueId, setLeagueId] = useState("");
+  const [showPrivate, setShowPrivate] = useState(false);
+  const [espnS2, setEspnS2] = useState("");
+  const [swid, setSwid] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [picking, setPicking] = useState<LeagueResponse | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    // Accept a full league URL too: …?leagueId=123456
+    const id = (leagueId.match(/leagueId=(\d+)/)?.[1] ?? leagueId).trim();
+    if (!id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const cookies = showPrivate && espnS2.trim() && swid.trim() ? { espnS2: espnS2.trim(), swid: swid.trim() } : undefined;
+      const data = await fetchEspnLeague(id, cookies);
+      if (data.league.myRosterId != null) onFinish(data, data.league.myRosterId);
+      else setPicking(data);
+    } catch (err) {
+      if (err instanceof LeagueError && err.needsCookies) setShowPrivate(true);
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (picking)
+    return (
+      <div>
+        <UnmatchedNote data={picking} />
+        <TeamPicker data={picking} onBack={() => setPicking(null)} onPick={(id) => onFinish(picking, id)} reason={`Pick your team in ${picking.league.name}.`} />
+      </div>
+    );
+
+  return (
+    <form onSubmit={submit}>
+      <h3 className="font-display text-2xl font-bold uppercase">Import from ESPN</h3>
+      <p className="mb-4 text-sm text-muted">
+        Paste your league ID, or the whole league URL. On ESPN, open your league and look for <code className="text-ink">leagueId=…</code> in the address bar.
+      </p>
+      <div className="flex gap-2">
+        <input value={leagueId} onChange={(e) => setLeagueId(e.target.value)} placeholder="League ID or URL" inputMode="url" autoCapitalize="none" className={inputCls} />
+        <button disabled={!leagueId.trim() || busy} className={primaryBtn}>
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+          Import
+        </button>
+      </div>
+
+      <button type="button" onClick={() => setShowPrivate((v) => !v)} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-ink">
+        <ChevronDown className={clsx("size-4 transition", showPrivate && "rotate-180")} /> Private league?
+      </button>
+      <AnimatePresence initial={false}>
+        {showPrivate && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="mt-3 space-y-3 rounded-2xl border border-line bg-surface-2 p-4">
+              <p className="text-xs leading-relaxed text-muted">
+                Private ESPN leagues need two cookies from your browser. On a computer, log in at espn.com, open DevTools (F12) → <b>Application</b> →{" "}
+                <b>Cookies</b> → <code>https://www.espn.com</code>, and copy the values of <code>espn_s2</code> and <code>SWID</code>. They&apos;re sent to ESPN once
+                for this import and are never saved. Treat them like a password and don&apos;t share them.
+              </p>
+              <input value={espnS2} onChange={(e) => setEspnS2(e.target.value)} placeholder="espn_s2" autoComplete="off" spellCheck={false} className={clsx(inputCls, "w-full font-mono text-xs")} />
+              <input value={swid} onChange={(e) => setSwid(e.target.value)} placeholder="SWID  {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" autoComplete="off" spellCheck={false} className={clsx(inputCls, "w-full font-mono text-xs")} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <ErrorNote error={error} />
+    </form>
+  );
+}
+
+/* ---------------------------------------------------------------- Manual */
 
 function ManualBuilder({
   players,
