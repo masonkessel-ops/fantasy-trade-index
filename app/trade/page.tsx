@@ -22,7 +22,7 @@ export default async function TradePage({ searchParams }: PageProps<"/trade">) {
             Trade <span className="text-gradient">Analyzer</span>
           </>
         }
-        subtitle="Add players to each side and get an instant verdict. Multi-player packages are discounted, because one star beats two role players."
+        subtitle="Add players to each side and get an instant verdict. Verdicts use each player's trade power (real production), so two 70s never equal a 100, and multi-player packages are discounted."
       />
       <TradeAnalyzer
         players={board.players}

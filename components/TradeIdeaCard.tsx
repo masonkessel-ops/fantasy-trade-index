@@ -59,8 +59,8 @@ export function TradeIdeaCard({
           <span className={clsx("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold", v.cls)}>{v.label}</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Side label="You give" players={giveP} total={r.adjGive} color="text-rocket" />
-          <Side label="You get" players={getP} total={r.adjGet} color="text-volt" />
+          <Side label="You give" players={giveP} total={r.rawGive} color="text-rocket" />
+          <Side label="You get" players={getP} total={r.rawGet} color="text-volt" />
         </div>
         {note && <div className="mt-3 text-xs leading-relaxed text-muted">{note}</div>}
         <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-rocket">

@@ -8,7 +8,7 @@ import type { PlayerValue, Position, Scoring } from "./types";
 /* ============================== KNOBS ==================================== */
 
 /** A trade must improve your starting lineup's total value by at least this much. */
-export const MIN_LINEUP_GAIN = 3;
+export const MIN_LINEUP_GAIN = 2;
 /** …and can't hurt the other team's starters by more than this (keeps offers realistic). */
 export const MAX_PARTNER_LOSS = 5;
 /** How many of each roster's most valuable players the trade finder considers. */
@@ -113,7 +113,7 @@ function findTrades(
         for (const get of combos(gets, rSize)) {
           const t = evaluateTrade(give, get);
           if (t.verdict === "lose") continue;
-          if (t.diff > Math.max(6, Math.max(t.adjGive, t.adjGet) * 0.12)) continue; // too lopsided for them to accept
+          if (t.balance > 0.15 && t.diff > 2) continue; // too lopsided for them to accept
           const giveIds = new Set(give.map((p) => p.id));
           const getIds = new Set(get.map((p) => p.id));
           const myGain = starterValue([...mine.filter((p) => !giveIds.has(p.id)), ...get], rosterPositions) - baseMe;

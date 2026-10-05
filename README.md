@@ -46,9 +46,11 @@ Everything lives in **[`lib/tradeValue.ts`](lib/tradeValue.ts)**, with the tunab
 
 - `WEIGHTS`: how much each factor counts (season PPG 30%, last-3 form 15%, rest-of-season projection 25%, positional scarcity 15%, age 10%, bye week 5%)
 - `REPLACEMENT_RANK`: the replacement-level player at each position (default: 12-team league)
-- `POSITION_SCARCITY`, `STREAMABLE_DISCOUNT` (K/DST), `AGE_CURVE`, `INJURY_MULTIPLIER`, `byeScore()`, `TOP_EASE` / `LOW_CURVE` (shape of the 1–100 scale)
+- `POSITION_SCARCITY`, `STREAMABLE_DISCOUNT` (K/DST), `AGE_CURVE`, `INJURY_MULTIPLIER`, `byeScore()`, `DISPLAY_CURVE` (how compressed the 1–100 scale is)
 
 Production is measured as **points over replacement**, which is what makes an RB1 worth more than a QB1 who scores more raw points. Save the file and the whole site updates (the cache key includes the formula settings).
+
+**Value vs. power:** the displayed 1–100 value is compressed (good starters are 70+, the top ~10 are 90+, and ties are common). Each player also has a linear **power** proportional to production, and the Trade Analyzer, trade finder and AI assistant judge fairness on power. That way a 100 is never "fair" for two 70s.
 
 Related settings:
 - Trade verdict thresholds and the multi-player package discount: [`lib/tradeAnalysis.ts`](lib/tradeAnalysis.ts)

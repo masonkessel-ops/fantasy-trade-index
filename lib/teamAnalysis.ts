@@ -96,11 +96,17 @@ export function analyzeTeam(roster: PlayerValue[], board: PlayerValue[], rosterP
     const boardSorted = board.filter((p) => p.position === pos).sort((a, b) => b.value - a.value);
     let mine = 0;
     let benchmark = 0;
+    // Grades compare linear trade power (the displayed scale is compressed).
+    let minePower = 0;
+    let benchPower = 0;
     for (let k = 0; k < slots; k++) {
+      const b = boardSorted[Math.min(boardSorted.length - 1, k * teams + Math.floor(teams / 2))];
       mine += mineSorted[k]?.value ?? 0;
-      benchmark += boardSorted[Math.min(boardSorted.length - 1, k * teams + Math.floor(teams / 2))]?.value ?? 1;
+      benchmark += b?.value ?? 1;
+      minePower += mineSorted[k]?.power ?? 0;
+      benchPower += b?.power ?? 0.1;
     }
-    const ratio = mine / Math.max(1, benchmark);
+    const ratio = minePower / Math.max(0.1, benchPower);
     const depth = mineSorted.slice(slots).reduce((s, p) => s + p.value, 0);
     strengths.push({ position: pos, slots, mine, benchmark, ratio, grade: gradeFor(ratio), depth });
   }

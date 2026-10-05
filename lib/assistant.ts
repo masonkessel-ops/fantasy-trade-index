@@ -25,7 +25,7 @@ const SCORING_LABEL: Record<Scoring, string> = { ppr: "PPR", half: "Half-PPR", s
 /** Stable instructions — first in the prompt so they cache. */
 export const SYSTEM_INSTRUCTIONS = `You are the trade assistant for Fantasy Trade Index, a fantasy football site.
 
-You help users evaluate and find fair trades using Fantasy Trade Index's trade values: every player has a value from 1 to 100, built from season points per game, last-3-week form, rest-of-season projections, positional scarcity, age, injuries and bye weeks. In the site's trade analyzer, multi-player packages are discounted (the 2nd-best player on a side counts 85%, 3rd 70%, 4th 60%, then 50%), so one star is worth more than two average players with the same raw total. A trade is "fair" when the adjusted sides are within about 8%.
+You help users evaluate and find fair trades using Fantasy Trade Index values. Every player has a displayed value from 1 to 100 built from season points per game, last-3-week form, rest-of-season projections, positional scarcity, age, injuries and bye weeks. The displayed scale is compressed (good starters are 70+, the top ~10 are 90+), so each player also has a linear "power" (0-100, proportional to real production). Trade fairness is judged on power, not the displayed value: a 100 (power 100) is NOT fair for two 70s (power ~25 each). In the site's analyzer, multi-player packages are also discounted (the 2nd-best player on a side counts 85%, 3rd 70%, 4th 60%, then 50%). A trade is "fair" when the adjusted power of the two sides is within about 10%.
 
 How to answer:
 - Ground every claim in the numbers provided (values, PPG, last-3, rest-of-season PPG, injury status). Quote values like "Nabers (74)".
@@ -38,21 +38,21 @@ Trade suggestions:
 When the question is about trades (finding, evaluating, or valuing them), end your reply with 2-3 concrete trade ideas in this exact machine-readable block, after all prose:
 <trades>[{"title": "short label", "give": ["<player id>"], "get": ["<player id>"], "partner": "<league team name or null>", "why": "one sentence"}]</trades>
 - "give" = players the user sends away, "get" = players the user receives, using the ids from the data.
-- Aim for trades that are fair or slightly favor the user (adjusted values within ~10%), and realistic for the other side.
+- Aim for trades that are fair or slightly favor the user (adjusted power within ~10%), and realistic for the other side.
 - Don't mention the block or the ids in your prose; the app turns the block into clickable cards.
 - Omit the block entirely for questions that aren't about trades.`;
 
 const fmt = (n: number | null) => (n === null ? "-" : String(n));
 
 function playerLine(p: PlayerValue) {
-  return [p.id, p.name, p.position, p.team ?? "FA", p.value, fmt(p.ppg), fmt(p.recentPpg), fmt(p.rosPpg), fmt(p.age), p.injuryStatus ?? "", p.byeWeek ?? ""].join("|");
+  return [p.id, p.name, p.position, p.team ?? "FA", p.value, p.power, fmt(p.ppg), fmt(p.recentPpg), fmt(p.rosPpg), fmt(p.age), p.injuryStatus ?? "", p.byeWeek ?? ""].join("|");
 }
 
 /** The value board as compact pipe-separated rows (cached block). */
 export function boardContext(board: ValueBoard, limit = 260) {
   const rows = board.players.slice(0, limit).map(playerLine).join("\n");
   return `TRADE VALUE BOARD — ${board.season} season, after week ${board.week}, ${SCORING_LABEL[board.scoring]} scoring. Top ${Math.min(limit, board.players.length)} players by value.
-Columns: id|name|pos|team|value|season_ppg|last3_ppg|ros_proj_ppg|age|injury|bye_week
+Columns: id|name|pos|team|value|power|season_ppg|last3_ppg|ros_proj_ppg|age|injury|bye_week
 ${rows}`;
 }
 
@@ -66,7 +66,7 @@ export function teamContext(team: AssistantTeamContext | undefined, board: Value
   const byId = new Map(board.players.map((p) => [p.id, p]));
   const describe = (id: string) => {
     const p = byId.get(id);
-    return p ? `${p.name} (${p.id}, ${p.position}, ${p.value})` : null;
+    return p ? `${p.name} (${p.id}, ${p.position}, value ${p.value}, power ${p.power})` : null;
   };
   const roster = team.playerIds
     .map((id) => byId.get(id))
@@ -84,7 +84,7 @@ export function teamContext(team: AssistantTeamContext | undefined, board: Value
     if (s) lines.push(`League scoring settings: ${s}`);
   }
   if (team.rosterPositions?.length) lines.push(`Starting lineup slots: ${team.rosterPositions.filter((s) => s !== "BN" && s !== "IR").join(", ")}`);
-  lines.push(`User's roster (id|name|pos|team|value|season_ppg|last3_ppg|ros_proj_ppg|age|injury|bye_week):`);
+  lines.push(`User's roster (id|name|pos|team|value|power|season_ppg|last3_ppg|ros_proj_ppg|age|injury|bye_week):`);
   lines.push(...roster.map(playerLine));
   const off = team.playerIds.length - roster.length;
   if (off > 0) lines.push(`(+${off} rostered players not on the value board, i.e. near-zero trade value)`);

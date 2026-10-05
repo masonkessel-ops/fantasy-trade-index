@@ -13,12 +13,12 @@ export default async function Home() {
   const scoring = await getScoring();
   const [board, live] = await Promise.all([getValueBoard(scoring), getLiveWeek(scoring)]);
   const top = board.players.slice(0, 8);
-  const movers = board.players.filter((p) => p.change !== null && p.value >= 15);
+  const movers = board.players.filter((p) => p.change !== null && p.value >= 55);
   const risers = [...movers].sort((a, b) => b.change! - a.change!).slice(0, 5);
   const fallers = [...movers].sort((a, b) => a.change! - b.change!).slice(0, 5);
   // Hot = biggest jump in last-3 PPG over season PPG, among real contributors.
   const hot = board.players
-    .filter((p) => p.recentPpg !== null && p.recentPpg >= 12 && p.value >= 15 && p.gamesPlayed >= 2 && p.position !== "K" && p.position !== "DST")
+    .filter((p) => p.recentPpg !== null && p.recentPpg >= 12 && p.value >= 60 && p.gamesPlayed >= 2 && p.position !== "K" && p.position !== "DST")
     .sort((a, b) => b.recentPpg! - b.ppg - (a.recentPpg! - a.ppg) || b.recentPpg! - a.recentPpg!)
     .slice(0, 6);
   const liveCount = live.games.filter((g) => g.state === "live").length;

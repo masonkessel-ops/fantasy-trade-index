@@ -62,6 +62,8 @@ export interface PlayerValue {
   age: number | null;
   injuryStatus: string | null;
   value: number;
+  /** linear 0–100 trade power (proportional to production); trade fairness uses this */
+  power: number;
   /** value change vs. one week ago (null if no history) */
   change: number | null;
   overallRank: number;

@@ -151,6 +151,7 @@ async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
       age: p.age,
       injuryStatus: p.injuryStatus,
       value: r.value,
+      power: r.power,
       change: prev === null ? null : r.value - prev,
       overallRank: i + 1,
       posRank: displayPosRank.get(r.id)!,

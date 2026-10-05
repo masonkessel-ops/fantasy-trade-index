@@ -28,8 +28,11 @@
  *  3. INJURY multiplier on top (Out = 0.65×, IR = 0.4×, …), and a discount
  *     for streamable positions (K, DST).
  *
- *  4. The best player is 100; the scale flattens near the top (TOP_EASE) so
- *     elite players spread through the 90s.
+ *  4. The best player is 100. Displayed values use a compressed scale
+ *     (DISPLAY_CURVE) so good players sit in the 70s–90s and ties are common.
+ *     Each player also gets a linear "trade power" (0–100, proportional to
+ *     production) that the Trade Analyzer uses, so a 100 is never "fair" for
+ *     two 50s.
  * ============================================================================
  */
 import type { Position } from "./types";
@@ -81,8 +84,8 @@ export const STREAMABLE_DISCOUNT: Record<Position, number> = {
   RB: 1,
   WR: 1,
   TE: 1,
-  K: 0.35,
-  DST: 0.4,
+  K: 0.15,
+  DST: 0.2,
 };
 
 /**
@@ -133,19 +136,17 @@ export function byeScore(byeWeek: number | null, currentWeek: number): number {
 }
 
 /**
- * Shape of the final 1–100 scale: value = 100 × (1 − (1 − s^LOW_CURVE)^TOP_EASE),
- * where s is the player's score relative to the best player.
- * - TOP_EASE > 1 flattens the top so elite players spread through the 90s
- *   (100, 97, 96, 90…) instead of jumping 100 → 93.
- * - LOW_CURVE < 1 lifts the bottom so bench players don't all collapse to 1.
- * Both = 1 gives a straight line.
+ * Shape of the displayed 1–100 scale: value = 100 × s^DISPLAY_CURVE, where s is
+ * the player's score relative to the best player (0–1). Lower = more
+ * compressed: with 0.27 roughly the top 50 players are 70+, the top 10 are
+ * 90+, and depth players land in the 40s–50s. Trade math uses the linear
+ * `power` instead, so compression never makes depth look like stars.
  */
-export const TOP_EASE = 1.3;
-export const LOW_CURVE = 0.85;
+export const DISPLAY_CURVE = 0.27;
 
 /** Changes whenever a knob above changes, so cached values refresh immediately. */
 export const FORMULA_KEY = JSON.stringify([
-  WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, TOP_EASE, LOW_CURVE,
+  WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, DISPLAY_CURVE,
   STREAMABLE_DISCOUNT, DEPTH_CREDIT,
   byeScore.toString(),
 ]);
@@ -171,7 +172,10 @@ export interface ValueInput {
 
 export interface ValueResult {
   id: string;
+  /** displayed 1–100 value (compressed) */
   value: number;
+  /** linear trade power 0–100, proportional to production; used for trade fairness */
+  power: number;
   posRank: number;
   /** each factor's 0–1 score, plus injury multiplier, for the breakdown UI */
   breakdown: Record<keyof typeof WEIGHTS | "injury", number>;
@@ -277,21 +281,22 @@ export function computeTradeValues(inputs: ValueInput[], currentWeek: number): V
     return { id: v.p.id, rank, score: production * modifiers * injury * streamable, scores: { ...scores, injury } };
   });
 
-  // 6. Best player = 100; shape the scale (see TOP_EASE / LOW_CURVE).
+  // 6. Best player = 100. Display value is compressed; power stays linear.
   const top = Math.max(1e-9, ...raw.map((r) => r.score));
   return raw.map((r) => ({
     id: r.id,
     posRank: r.rank,
-    value: Math.max(1, Math.round(100 * (1 - Math.pow(1 - Math.pow(r.score / top, LOW_CURVE), TOP_EASE)))),
+    value: Math.max(1, Math.round(100 * Math.pow(r.score / top, DISPLAY_CURVE))),
+    power: Math.round((1000 * r.score) / top) / 10,
     breakdown: r.scores,
   }));
 }
 
 /** Friendly tier label for a value. */
 export function valueTier(value: number): { label: string; tone: "elite" | "star" | "starter" | "flex" | "depth" } {
-  if (value >= 85) return { label: "Elite", tone: "elite" };
-  if (value >= 65) return { label: "Star", tone: "star" };
-  if (value >= 45) return { label: "Starter", tone: "starter" };
-  if (value >= 25) return { label: "Flex", tone: "flex" };
+  if (value >= 90) return { label: "Elite", tone: "elite" };
+  if (value >= 80) return { label: "Star", tone: "star" };
+  if (value >= 70) return { label: "Starter", tone: "starter" };
+  if (value >= 55) return { label: "Flex", tone: "flex" };
   return { label: "Depth", tone: "depth" };
 }

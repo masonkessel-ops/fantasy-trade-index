@@ -98,6 +98,9 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
               <ValueBadge value={value.value} size="lg" />
               <div className="sm:text-right">
                 <div className="text-xs font-bold uppercase tracking-widest text-muted">{tier.label} tier</div>
+                <div className="text-xs text-muted" title="Linear 0–100 production score used to judge trade fairness">
+                  Trade power <b className="text-ink">{value.power}</b>
+                </div>
                 <div className="flex items-center gap-1 text-xs text-muted sm:justify-end">
                   vs last week <ChangePill change={value.change} />
                 </div>

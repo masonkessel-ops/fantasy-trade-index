@@ -9,7 +9,7 @@ import { CountUp } from "@/components/CountUp";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { useMyTeam } from "@/lib/myTeam";
-import { evaluateTrade, suggestBalancers, type TradeResult } from "@/lib/tradeAnalysis";
+import { edgeLabel, evaluateTrade, suggestBalancers, type TradeResult } from "@/lib/tradeAnalysis";
 import type { PlayerValue } from "@/lib/types";
 
 type Side = "give" | "get";
@@ -93,7 +93,7 @@ export function TradeAnalyzer({
           subtitle={team ? `From ${team.name}` : "Players you send away"}
           accent="var(--color-rocket)"
           players={giveP}
-          adjusted={result.adjGive}
+          adjusted={result.rawGive}
           searchPool={players}
           quickPicks={myRoster}
           exclude={inTrade}
@@ -111,7 +111,7 @@ export function TradeAnalyzer({
           subtitle={partnerTeam ? `From ${partnerTeam.teamName}` : "Players you receive"}
           accent="var(--color-volt)"
           players={getP}
-          adjusted={result.adjGet}
+          adjusted={result.rawGet}
           searchPool={players}
           quickPicks={partnerRoster}
           exclude={inTrade}
@@ -150,8 +150,7 @@ export function TradeAnalyzer({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{b.player.name}</span>
                     <span className="block truncate text-xs text-muted">
-                      {b.player.position} · {b.player.team} · leaves {b.newDiff > 0 ? "+" : ""}
-                      {b.newDiff}
+                      {b.player.position} · {b.player.team} · {Math.abs(b.newBalance) < 0.1 ? "makes it fair" : `leaves ${Math.round(Math.abs(b.newBalance) * 100)}% ${b.newBalance > 0 ? "your way" : "their way"}`}
                     </span>
                   </span>
                   <ValueBadge value={b.player.value} size="sm" />
@@ -250,7 +249,7 @@ function SidePanel({
           <p className="text-xs text-muted">{subtitle}</p>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint">Trade value</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint">Total value</div>
           <CountUp value={adjusted} className="font-display text-3xl font-bold tabular" />
         </div>
       </div>
@@ -322,7 +321,7 @@ function VerdictLabel({ result, small }: { result: TradeResult; small?: boolean 
       </div>
       {result.verdict !== "empty" && (
         <div className={clsx("text-muted", small ? "text-[11px]" : "mt-2 text-sm")}>
-          {result.diff === 0 ? "Dead even" : `${result.diff > 0 ? "+" : "−"}${Math.abs(result.diff)} value ${result.diff > 0 ? "in your favor" : "against you"}`}
+          {edgeLabel(result)}
         </div>
       )}
     </div>
@@ -353,12 +352,10 @@ function VerdictCard({ result }: { result: TradeResult }) {
           <Meter balance={result.balance} active={result.verdict !== "empty"} />
           <div className="mt-3 flex justify-between text-xs text-muted">
             <span>
-              You give <b className="text-ink">{result.adjGive}</b>
-              {result.rawGive !== result.adjGive && <span className="text-faint"> (raw {result.rawGive})</span>}
+              You give <b className="text-ink">{result.rawGive}</b> <span className="text-faint">value</span>
             </span>
             <span>
-              You get <b className="text-ink">{result.adjGet}</b>
-              {result.rawGet !== result.adjGet && <span className="text-faint"> (raw {result.rawGet})</span>}
+              You get <b className="text-ink">{result.rawGet}</b> <span className="text-faint">value</span>
             </span>
           </div>
         </div>
