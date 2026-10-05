@@ -23,17 +23,21 @@ export interface YahooSession {
   name: string;
 }
 
+const env = (name: string) => process.env[name]?.trim() ?? "";
+const clientId = () => env("YAHOO_CLIENT_ID");
+const clientSecret = () => env("YAHOO_CLIENT_SECRET");
+
 export function yahooConfigured() {
-  return !!(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET && process.env.SESSION_SECRET);
+  return !!(clientId() && clientSecret() && env("SESSION_SECRET"));
 }
 
 export function redirectUri(origin: string) {
-  return process.env.YAHOO_REDIRECT_URI || `${origin}/api/yahoo/callback`;
+  return env("YAHOO_REDIRECT_URI") || `${origin}/api/yahoo/callback`;
 }
 
 export function authorizeUrl(origin: string, state: string) {
   const q = new URLSearchParams({
-    client_id: process.env.YAHOO_CLIENT_ID!,
+    client_id: clientId(),
     redirect_uri: redirectUri(origin),
     response_type: "code",
     language: "en-us",
@@ -44,7 +48,7 @@ export function authorizeUrl(origin: string, state: string) {
 
 /* -------------------------------------------------- encrypted session cookie */
 
-const key = () => createHash("sha256").update(process.env.SESSION_SECRET ?? "").digest();
+const key = () => createHash("sha256").update(env("SESSION_SECRET")).digest();
 
 export function sealSession(s: YahooSession) {
   const iv = randomBytes(12);
@@ -54,7 +58,7 @@ export function sealSession(s: YahooSession) {
 }
 
 export function unsealSession(value: string | undefined): YahooSession | null {
-  if (!value || !process.env.SESSION_SECRET) return null;
+  if (!value || !env("SESSION_SECRET")) return null;
   try {
     const buf = Buffer.from(value, "base64url");
     const d = createDecipheriv("aes-256-gcm", key(), buf.subarray(0, 12));
@@ -76,14 +80,18 @@ export const sessionCookieOptions = {
 /* ------------------------------------------------------------- token calls */
 
 async function tokenRequest(params: Record<string, string>, origin: string) {
-  const basic = Buffer.from(`${process.env.YAHOO_CLIENT_ID}:${process.env.YAHOO_CLIENT_SECRET}`).toString("base64");
+  const basic = Buffer.from(`${clientId()}:${clientSecret()}`).toString("base64");
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ ...params, redirect_uri: redirectUri(origin) }),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Yahoo token request failed (${res.status})`);
+  if (!res.ok) {
+    // Yahoo returns e.g. {"error":"invalid_client"} / "invalid_grant" / redirect_uri mismatch. Not secret.
+    const body = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
+    throw new YahooTokenError(String(body.error || `http_${res.status}`).slice(0, 60));
+  }
   return res.json() as Promise<{ access_token: string; refresh_token: string; expires_in: number; id_token?: string }>;
 }
 
@@ -108,6 +116,9 @@ async function refresh(s: YahooSession, origin: string): Promise<YahooSession> {
 }
 
 export class YahooAuthError extends Error {}
+
+/** Yahoo refused a token request; `message` is Yahoo's short error code. */
+export class YahooTokenError extends Error {}
 
 /**
  * GET from the Yahoo Fantasy API, refreshing the access token when needed.

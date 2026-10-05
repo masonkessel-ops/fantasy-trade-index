@@ -16,7 +16,25 @@ const YAHOO_MESSAGES: Record<string, { text: string; ok: boolean }> = {
   not_configured: { text: "Yahoo sign-in isn't set up on this site yet.", ok: false },
 };
 
-export function MyTeam({ players, scoring, yahooStatus }: { players: PlayerValue[]; scoring: Scoring; yahooStatus: string | null }) {
+const DETAIL_HELP: Record<string, string> = {
+  invalid_client: "Yahoo rejected the app keys. Check that YAHOO_CLIENT_ID is the Consumer Key and YAHOO_CLIENT_SECRET is the Consumer Secret in Vercel, then redeploy.",
+  invalid_grant: "Yahoo rejected the sign-in code. Try once more; if it repeats, check that your Yahoo app's Redirect URI is exactly https://fantasy-trade-index.vercel.app/api/yahoo/callback.",
+  redirect_uri_mismatch: "In your Yahoo app, the Redirect URI must be exactly https://fantasy-trade-index.vercel.app/api/yahoo/callback.",
+  state_cookie_missing: "Your browser blocked the sign-in cookie. Try again, and make sure cookies are allowed for this site.",
+  state_mismatch: "The sign-in took too long or was started twice. Please try again.",
+};
+
+export function MyTeam({
+  players,
+  scoring,
+  yahooStatus,
+  yahooDetail = null,
+}: {
+  players: PlayerValue[];
+  scoring: Scoring;
+  yahooStatus: string | null;
+  yahooDetail?: string | null;
+}) {
   const [team, setTeam, hydrated] = useMyTeam();
   const [notice, setNotice] = useState(yahooStatus ? YAHOO_MESSAGES[yahooStatus] : undefined);
 
@@ -25,6 +43,11 @@ export function MyTeam({ players, scoring, yahooStatus }: { players: PlayerValue
       <span>
         {notice.text}
         {notice.ok && team && " To switch to it, click Reset on your current team first."}
+        {!notice.ok && yahooDetail && (
+          <span className="mt-1 block text-xs opacity-90">
+            {DETAIL_HELP[yahooDetail] ?? "Yahoo said:"} <code className="opacity-70">({yahooDetail})</code>
+          </span>
+        )}
       </span>
       <button onClick={() => setNotice(undefined)} aria-label="Dismiss" className="shrink-0 opacity-70 hover:opacity-100">
         <X className="size-4" />
