@@ -7,6 +7,8 @@ import clsx from "clsx";
 import { ArrowRight } from "lucide-react";
 import { PlayerAvatar } from "./PlayerBits";
 import { evaluateTrade } from "@/lib/tradeAnalysis";
+import { tradeRiskReward } from "@/lib/risk";
+import { RiskRewardPill } from "./RiskReward";
 import type { PlayerValue } from "@/lib/types";
 
 const VERDICT = {
@@ -41,6 +43,7 @@ export function TradeIdeaCard({
   const giveP = give.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p);
   const getP = get.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p);
   const r = evaluateTrade(giveP, getP);
+  const rr = tradeRiskReward(giveP, getP);
   const href = `/trade?give=${give.join(",")}&get=${get.join(",")}${partnerRosterId ? `&partner=${partnerRosterId}` : ""}`;
   const v = VERDICT[r.verdict];
   return (
@@ -62,7 +65,8 @@ export function TradeIdeaCard({
           <Side label="You give" players={giveP} total={r.rawGive} color="text-rocket" />
           <Side label="You get" players={getP} total={r.rawGet} color="text-volt" />
         </div>
-        {note && <div className="mt-3 text-xs leading-relaxed text-muted">{note}</div>}
+        {rr && <RiskRewardPill rr={rr} className="mt-3" />}
+        {note && <div className="mt-2 text-xs leading-relaxed text-muted">{note}</div>}
         <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-rocket">
           Open in Trade Analyzer <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
         </span>

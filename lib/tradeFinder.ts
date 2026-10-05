@@ -6,6 +6,10 @@
  */
 import { bestLineup } from "./teamAnalysis";
 import { evaluateTrade } from "./tradeAnalysis";
+import { tradeRiskReward } from "./risk";
+
+/** How much taking on extra risk (0–1 scale) lowers an idea's ranking. */
+export const RISK_PENALTY = 25;
 import type { PlayerValue } from "./types";
 
 export interface FinderPool {
@@ -69,7 +73,7 @@ export function shopPlayers(give: PlayerValue[], mine: PlayerValue[], pools: Fin
         const t = evaluateTrade(give, get);
         if (t.verdict === "lose" || t.balance > MAX_EDGE) continue;
         const lineupGain = Math.round(starterValue([...after, ...get], rosterPositions) - base);
-        const score = t.balance * 60 + lineupGain - (size - 1) * 2;
+        const score = t.balance * 60 + lineupGain - (size - 1) * 2 - (tradeRiskReward(give, get)?.riskChange ?? 0) * RISK_PENALTY;
         perPartner.push({ give: give.map((p) => p.id), get: get.map((p) => p.id), partner: pool.rosterId === null ? null : { rosterId: pool.rosterId, teamName: pool.teamName }, lineupGain, balance: t.balance, score });
       }
     }
@@ -93,7 +97,7 @@ export function findOffers(target: PlayerValue[], mine: PlayerValue[], rosterPos
       const giveIds = new Set(give.map((p) => p.id));
       const lineupGain = Math.round(starterValue([...mine.filter((p) => !giveIds.has(p.id)), ...target], rosterPositions) - base);
       if (lineupGain < -MAX_LINEUP_LOSS) continue; // would gut your lineup (e.g. trading your only QB)
-      const score = lineupGain + t.balance * 30 - (size - 1) * 2;
+      const score = lineupGain + t.balance * 30 - (size - 1) * 2 - (tradeRiskReward(give, target)?.riskChange ?? 0) * RISK_PENALTY;
       ideas.push({ give: give.map((p) => p.id), get: target.map((p) => p.id), partner: partner ? { rosterId: partner.rosterId, teamName: partner.teamName } : null, lineupGain, balance: t.balance, score });
     }
   }

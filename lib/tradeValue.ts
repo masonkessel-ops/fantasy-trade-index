@@ -138,15 +138,23 @@ export function byeScore(byeWeek: number | null, currentWeek: number): number {
 /**
  * Shape of the displayed 1–100 scale: value = 100 × s^DISPLAY_CURVE, where s is
  * the player's score relative to the best player (0–1). Lower = more
- * compressed: with 0.27 roughly the top 50 players are 70+, the top 10 are
- * 90+, and depth players land in the 40s–50s. Trade math uses the linear
- * `power` instead, so compression never makes depth look like stars.
+ * compressed: with 0.17 the top ~10 are 93+, roughly the top 50 are 80+, the
+ * top ~150 are 60+, and only deep bench players fall below 50. Ties are common.
  */
-export const DISPLAY_CURVE = 0.27;
+export const DISPLAY_CURVE = 0.17;
+
+/**
+ * Trade weight ("power") = 100 × (value / 100)^TRADE_CURVE. Stars cost a
+ * premium: with 3.3 a 100 is worth about an 80 + 80 + 60 package (after the
+ * package discount in lib/tradeAnalysis.ts), while 70 + 30 is nowhere close
+ * and two 90s beat a 100. Trade verdicts, the trade finder and position
+ * grades all use this.
+ */
+export const TRADE_CURVE = 3.3;
 
 /** Changes whenever a knob above changes, so cached values refresh immediately. */
 export const FORMULA_KEY = JSON.stringify([
-  WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, DISPLAY_CURVE,
+  WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, DISPLAY_CURVE, TRADE_CURVE,
   STREAMABLE_DISCOUNT, DEPTH_CREDIT,
   byeScore.toString(),
 ]);
@@ -174,7 +182,7 @@ export interface ValueResult {
   id: string;
   /** displayed 1–100 value (compressed) */
   value: number;
-  /** linear trade power 0–100, proportional to production; used for trade fairness */
+  /** trade weight 0–100 (value^TRADE_CURVE): stars cost a premium in trades */
   power: number;
   posRank: number;
   /** each factor's 0–1 score, plus injury multiplier, for the breakdown UI */
@@ -286,17 +294,25 @@ export function computeTradeValues(inputs: ValueInput[], currentWeek: number): V
   return raw.map((r) => ({
     id: r.id,
     posRank: r.rank,
-    value: Math.max(1, Math.round(100 * Math.pow(r.score / top, DISPLAY_CURVE))),
-    power: Math.round((1000 * r.score) / top) / 10,
+    ...withPower(Math.max(1, Math.round(100 * Math.pow(r.score / top, DISPLAY_CURVE)))),
     breakdown: r.scores,
   }));
 }
 
+/** Trade weight for a displayed value (see TRADE_CURVE). */
+export function tradePower(value: number) {
+  return Math.round(1000 * Math.pow(value / 100, TRADE_CURVE)) / 10;
+}
+
+function withPower(value: number) {
+  return { value, power: tradePower(value) };
+}
+
 /** Friendly tier label for a value. */
 export function valueTier(value: number): { label: string; tone: "elite" | "star" | "starter" | "flex" | "depth" } {
-  if (value >= 90) return { label: "Elite", tone: "elite" };
-  if (value >= 80) return { label: "Star", tone: "star" };
-  if (value >= 70) return { label: "Starter", tone: "starter" };
-  if (value >= 55) return { label: "Flex", tone: "flex" };
+  if (value >= 93) return { label: "Elite", tone: "elite" };
+  if (value >= 85) return { label: "Star", tone: "star" };
+  if (value >= 76) return { label: "Starter", tone: "starter" };
+  if (value >= 65) return { label: "Flex", tone: "flex" };
   return { label: "Depth", tone: "depth" };
 }

@@ -22,6 +22,7 @@ const RosterSchema = z.object({
       name: z.string(),
       position: z.string().nullable(),
       nflTeam: z.string().nullable(),
+      isStarter: z.boolean().nullable(),
     }),
   ),
 });
@@ -31,6 +32,7 @@ List every NFL player on the user's roster that is visible: starters, bench and 
 - name: exactly as shown (abbreviations like "J. Gibbs" are fine).
 - position: QB, RB, WR, TE, K or DEF as shown, or null.
 - nflTeam: the NFL team abbreviation shown next to the player, or null.
+- isStarter: true if the player is in a starting lineup slot, false if on the bench (BN) or IR, null if you can't tell.
 - For a team defense, use the team name (e.g. "Chicago Bears") and position DEF.
 Skip opponents, empty slots, projections and anything that isn't a player on this roster.
 teamName: the fantasy team's name if visible, else null.`;
@@ -78,7 +80,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Couldn't read a roster from that image. Try a clearer screenshot of your team page." }, { status: 422 });
     }
     const { teamName, players } = response.parsed_output;
-    const { matched, unmatched } = await matchEntries(players.map((p) => ({ name: p.name, position: p.position, team: p.nflTeam })));
+    const { matched, unmatched } = await matchEntries(players.map((p) => ({ name: p.name, position: p.position, team: p.nflTeam, starter: p.isStarter })));
     return NextResponse.json({ teamName, matched, unmatched });
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) return NextResponse.json({ error: "The site's Anthropic API key is invalid." }, { status: 502 });

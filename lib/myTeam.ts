@@ -40,6 +40,8 @@ export interface SavedTeam {
     username: string;
     provider?: LeagueProvider;
   };
+  /** for non-league teams: player ids in the starting lineup (league teams use league.teams[].starters) */
+  starters?: string[];
   /** id -> basic info for rostered players who aren't on the value chart */
   directory: Record<string, { name: string; position: string; team: string | null }>;
   updatedAt: number;

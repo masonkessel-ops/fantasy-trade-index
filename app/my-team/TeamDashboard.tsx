@@ -11,7 +11,7 @@ import { PlayerSearch } from "@/components/PlayerSearch";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { setScoringCookie } from "@/components/ScoringToggle";
 import type { SavedTeam } from "@/lib/myTeam";
-import { SLOT_LABEL, analyzeTeam, gradeColor } from "@/lib/teamAnalysis";
+import { SLOT_LABEL, analyzeTeam, bestLineup, gradeColor, type LineupSlot } from "@/lib/teamAnalysis";
 import { POS_COLOR } from "@/lib/ui";
 import { SCORINGS, type PlayerValue, type Position, type Scoring } from "@/lib/types";
 import { Avatar } from "./TeamSetup";
@@ -84,6 +84,28 @@ export function TeamDashboard({
   }
 
   const record = team.league?.teams.find((t) => t.rosterId === team.league!.myRosterId);
+
+  // Starting lineup vs bench: the league's lineup when imported, your own picks for other teams,
+  // otherwise the best lineup by value.
+  const leagueStarters = record?.starters?.length ? record.starters : null;
+  const chosenStarters = leagueStarters ?? team.starters ?? null;
+  const canEditLineup = !leagueStarters;
+  let starterSlots: LineupSlot[] = analysis.lineup.starters;
+  let benchList: PlayerValue[] = analysis.lineup.bench;
+  if (chosenStarters) {
+    const chosen = new Set(chosenStarters);
+    const fit = bestLineup(roster.filter((p) => chosen.has(p.id)), team.rosterPositions);
+    starterSlots = fit.starters;
+    benchList = [...roster.filter((p) => !chosen.has(p.id)), ...fit.bench].sort((a, b) => b.value - a.value);
+  }
+  const lineupNote = leagueStarters
+    ? `As set in your ${PROVIDER_LABEL[team.source] ?? ""} league. Sync to refresh.`
+    : team.starters
+      ? "Your lineup. Tap Bench or Start to change it."
+      : "Best lineup by value. Tap Bench or Start to set your own.";
+  const currentStarterIds = starterSlots.map((s) => s.player?.id).filter((id): id is string => !!id);
+  const moveToBench = (id: string) => onChange({ ...team, starters: currentStarterIds.filter((x) => x !== id) });
+  const moveToStart = (id: string) => onChange({ ...team, starters: [...currentStarterIds, id] });
 
   return (
     <div className="space-y-5">
@@ -248,18 +270,26 @@ export function TeamDashboard({
         </div>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
-        {/* Lineup */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-2">
+        {/* Starters */}
         <section className="card animate-rise p-5 [animation-delay:260ms]">
-          <h2 className="mb-3 font-display text-xl font-bold uppercase tracking-wide">Best lineup</h2>
+          <div className="mb-1 flex items-baseline justify-between">
+            <h2 className="font-display text-xl font-bold uppercase tracking-wide">Starting lineup</h2>
+            <span className="text-xs text-faint">{currentStarterIds.length} starting</span>
+          </div>
+          <p className="mb-3 text-xs text-muted">{lineupNote}</p>
           <ul className="space-y-1.5">
-            {analysis.lineup.starters.map((s, i) => (
+            {starterSlots.map((s, i) => (
               <li key={i} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2">
                 <span className="w-10 text-center text-[11px] font-bold text-faint">{SLOT_LABEL[s.slot] ?? s.slot}</span>
                 {s.player ? (
-                  <RosterRow p={s.player} onRemove={team.source === "manual" ? () => setPlayers(team.playerIds.filter((id) => id !== s.player!.id)) : undefined} />
+                  <RosterRow
+                    p={s.player}
+                    move={canEditLineup ? { label: "Bench", onClick: () => moveToBench(s.player!.id) } : undefined}
+                    onRemove={team.source === "manual" ? () => setPlayers(team.playerIds.filter((id) => id !== s.player!.id)) : undefined}
+                  />
                 ) : (
-                  <span className="flex-1 py-1.5 text-sm text-faint">Empty</span>
+                  <span className="flex-1 py-1.5 text-sm text-faint">Empty slot</span>
                 )}
               </li>
             ))}
@@ -267,16 +297,23 @@ export function TeamDashboard({
         </section>
 
         <section className="card animate-rise p-5 [animation-delay:300ms]">
-          <h2 className="mb-3 font-display text-xl font-bold uppercase tracking-wide">Bench</h2>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="font-display text-xl font-bold uppercase tracking-wide">Bench</h2>
+            <span className="text-xs text-faint">{benchList.length + offChart.length} on bench</span>
+          </div>
           {team.source === "manual" && (
             <div className="mb-3">
               <PlayerSearch players={players} exclude={team.playerIds} onSelect={(p) => setPlayers([...team.playerIds, p.id])} />
             </div>
           )}
           <ul className="space-y-1.5">
-            {analysis.lineup.bench.map((p) => (
+            {benchList.map((p) => (
               <li key={p.id} className="flex items-center gap-3 rounded-xl px-3 py-1.5">
-                <RosterRow p={p} onRemove={team.source === "manual" ? () => setPlayers(team.playerIds.filter((id) => id !== p.id)) : undefined} />
+                <RosterRow
+                  p={p}
+                  move={canEditLineup ? { label: "Start", onClick: () => moveToStart(p.id) } : undefined}
+                  onRemove={team.source === "manual" ? () => setPlayers(team.playerIds.filter((id) => id !== p.id)) : undefined}
+                />
               </li>
             ))}
             {offChart.map((id) => {
@@ -290,7 +327,7 @@ export function TeamDashboard({
                 </li>
               );
             })}
-            {analysis.lineup.bench.length === 0 && offChart.length === 0 && <li className="py-4 text-center text-sm text-faint">No bench players.</li>}
+            {benchList.length === 0 && offChart.length === 0 && <li className="py-4 text-center text-sm text-faint">No bench players.</li>}
           </ul>
         </section>
       </div>
@@ -386,7 +423,7 @@ function Callout({
   );
 }
 
-function RosterRow({ p, onRemove }: { p: PlayerValue; onRemove?: () => void }) {
+function RosterRow({ p, onRemove, move }: { p: PlayerValue; onRemove?: () => void; move?: { label: string; onClick: () => void } }) {
   return (
     <>
       <Link href={`/players/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
@@ -402,6 +439,14 @@ function RosterRow({ p, onRemove }: { p: PlayerValue; onRemove?: () => void }) {
         </span>
       </Link>
       <ValueBadge value={p.value} size="sm" />
+      {move && (
+        <button
+          onClick={move.onClick}
+          className="rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-line-strong hover:text-ink"
+        >
+          {move.label}
+        </button>
+      )}
       {onRemove && (
         <button onClick={onRemove} className="rounded-lg p-1.5 text-faint transition hover:bg-down/10 hover:text-down" aria-label={`Remove ${p.name}`}>
           <Trash2 className="size-4" />

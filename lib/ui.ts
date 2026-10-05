@@ -11,10 +11,10 @@ export const POS_COLOR: Record<Position, string> = {
 
 /** Colour for a 1–100 trade value: hot orange at the top, cooling to slate. */
 export function valueColor(value: number) {
-  if (value >= 90) return "#ff5a2c";
-  if (value >= 80) return "#ffb21e";
-  if (value >= 70) return "#2ee8ff";
-  if (value >= 55) return "#7c8cff";
+  if (value >= 93) return "#ff5a2c";
+  if (value >= 85) return "#ffb21e";
+  if (value >= 76) return "#2ee8ff";
+  if (value >= 65) return "#7c8cff";
   return "#6b7690";
 }
 

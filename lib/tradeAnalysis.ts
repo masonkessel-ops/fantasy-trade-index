@@ -1,12 +1,11 @@
 /**
  * Trade evaluation.
  *
- * Displayed values (1–100) are compressed so good players read 70+, which
- * would make "two 70s for a 100" look fair. It isn't, so trades are judged
- * on each player's linear trade *power* (proportional to production) instead.
- * On top of that, each extra player on a side counts for a little less
- * (CONSOLIDATION_WEIGHTS), because one star beats two role players when
- * roster spots and starting slots are limited.
+ * Trades are judged on each player's trade weight ("power" = value^3.3, see
+ * TRADE_CURVE in lib/tradeValue.ts), not the raw 1–100 value, because stars
+ * cost a premium: a 100 takes roughly 80 + 80 + 60, and 70 + 30 is nowhere
+ * close. On top of that, each extra player on a side counts for a little less
+ * (CONSOLIDATION_WEIGHTS), because roster spots and starting slots are limited.
  */
 import type { PlayerValue } from "./types";
 

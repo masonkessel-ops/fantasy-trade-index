@@ -34,7 +34,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
         scoring,
         team: {
           playerIds: team.playerIds,
-          starters: myRoster?.starters,
+          starters: myRoster?.starters?.length ? myRoster.starters : team.starters,
           rosterPositions: team.rosterPositions,
           myRosterId: team.league?.myRosterId,
           leagueTeams: team.league?.teams.map((t) => ({ rosterId: t.rosterId, teamName: t.teamName, players: t.players })),

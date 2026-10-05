@@ -9,7 +9,10 @@ import { CountUp } from "@/components/CountUp";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { useMyTeam } from "@/lib/myTeam";
+import { TradeFinder } from "../my-team/TradeFinder";
 import { edgeLabel, evaluateTrade, suggestBalancers, type TradeResult } from "@/lib/tradeAnalysis";
+import { tradeRiskReward } from "@/lib/risk";
+import { RiskRewardPanel, RiskTag } from "@/components/RiskReward";
 import type { PlayerValue } from "@/lib/types";
 
 type Side = "give" | "get";
@@ -121,7 +124,7 @@ export function TradeAnalyzer({
         />
       </div>
 
-      <VerdictCard result={result} />
+      <VerdictCard result={result} rr={tradeRiskReward(giveP, getP)} />
 
       <AnimatePresence>
         {balancers.length > 0 && (
@@ -191,6 +194,19 @@ export function TradeAnalyzer({
           </Link>
         )}
       </div>
+
+      {team ? (
+        <TradeFinder team={team} players={players} />
+      ) : (
+        <div className="card flex flex-col gap-2 p-5 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            <b className="text-ink">Trade finder:</b> add your team to type in who you want (or who you&apos;d trade away) and get fair trades from your roster.
+          </span>
+          <Link href="/my-team" className="shrink-0 font-semibold text-rocket hover:underline">
+            Add your team →
+          </Link>
+        </div>
+      )}
 
       {/* Mobile sticky verdict */}
       <AnimatePresence>
@@ -285,6 +301,7 @@ function SidePanel({
                 <span className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold">{p.name}</span>
                   <InjuryTag status={p.injuryStatus} />
+                  <RiskTag p={p} />
                 </span>
                 <span className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted">
                   <PosBadge pos={p.position} /> {p.team} · {p.ppg} ppg
@@ -328,7 +345,7 @@ function VerdictLabel({ result, small }: { result: TradeResult; small?: boolean 
   );
 }
 
-function VerdictCard({ result }: { result: TradeResult }) {
+function VerdictCard({ result, rr }: { result: TradeResult; rr: ReturnType<typeof tradeRiskReward> }) {
   return (
     <section className="card relative animate-rise overflow-hidden p-5 [animation-delay:180ms] sm:p-7">
       <motion.div
@@ -360,6 +377,11 @@ function VerdictCard({ result }: { result: TradeResult }) {
           </div>
         </div>
       </div>
+      {rr && (
+        <div className="relative mt-5">
+          <RiskRewardPanel rr={rr} />
+        </div>
+      )}
     </section>
   );
 }

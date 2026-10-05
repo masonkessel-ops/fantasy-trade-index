@@ -50,7 +50,9 @@ Everything lives in **[`lib/tradeValue.ts`](lib/tradeValue.ts)**, with the tunab
 
 Production is measured as **points over replacement**, which is what makes an RB1 worth more than a QB1 who scores more raw points. Save the file and the whole site updates (the cache key includes the formula settings).
 
-**Value vs. power:** the displayed 1–100 value is compressed (good starters are 70+, the top ~10 are 90+, and ties are common). Each player also has a linear **power** proportional to production, and the Trade Analyzer, trade finder and AI assistant judge fairness on power. That way a 100 is never "fair" for two 70s.
+**Value vs. trade weight:** the displayed 1–100 value is compressed (`DISPLAY_CURVE`): good starters are 80+, the top ~150 are about 60+, and ties are common. Trades are judged on **trade weight** = value^`TRADE_CURVE` (3.3), so stars cost a premium. A 100 takes about 80 + 80 + 60, and 70 + 30 is nowhere close.
+
+**Risk vs reward:** [`lib/risk.ts`](lib/risk.ts) rates each player's risk (injury, age, boom/bust weeks, small sample, falling value). Every trade shows the value edge next to the risk you take on or shed, and the trade finder ranks ideas with risk included.
 
 Related settings:
 - Trade verdict thresholds and the multi-player package discount: [`lib/tradeAnalysis.ts`](lib/tradeAnalysis.ts)

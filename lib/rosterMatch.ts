@@ -8,6 +8,8 @@ export interface RosterEntry {
   name: string;
   position?: string | null;
   team?: string | null;
+  /** true = starting slot, false = bench/IR, undefined = unknown */
+  starter?: boolean | null;
 }
 
 export interface MatchedPlayer {
@@ -15,6 +17,8 @@ export interface MatchedPlayer {
   name: string;
   position: Position;
   team: string | null;
+  /** true = starting slot, false = bench/IR, undefined = unknown */
+  starter?: boolean;
 }
 
 const POS: Record<string, Position> = { QB: "QB", RB: "RB", WR: "WR", TE: "TE", K: "K", PK: "K", DEF: "DST", DST: "DST", "D/ST": "DST" };
@@ -42,7 +46,7 @@ export async function matchEntries(entries: RosterEntry[]) {
     if (id && players[id] && !seen.has(id)) {
       seen.add(id);
       const p = players[id];
-      matched.push({ id, name: p.name, position: p.position, team: p.team });
+      matched.push({ id, name: p.name, position: p.position, team: p.team, starter: e.starter ?? undefined });
     } else if (!id) unmatched.push(name);
   }
   return { matched, unmatched };
@@ -73,6 +77,11 @@ function defenseByName(name: string, all: Player[]) {
 export async function matchRosterText(text: string) {
   const players = Object.values(await getPlayers());
   const lines = text.split(/\n/).map((l) => ` ${normalizeName(l)} `);
+  // Roster pages label each row with its slot; rows starting BN/IR are bench.
+  const SLOT_START = /^ (qb|rb|wr|te|flex|w r t|w\/r\/t|wrt|w r|w t|q w r t|sflex|op|k|def|d st|d\/st|dst|bn|bench|ir|res) /;
+  const hasSlots = lines.filter((l) => SLOT_START.test(l)).length >= 3;
+  const isBench = (line: string) => /^ (bn|bench|ir|res) /.test(line);
+  const lineOf = new Map<string, number>();
   const whole = ` ${lines.join(" ")} `;
   const found = new Map<string, MatchedPlayer>();
 
@@ -81,12 +90,13 @@ export async function matchRosterText(text: string) {
     const full = normalizeName(p.name);
     if (full.split(" ").length >= 2 && whole.includes(` ${full} `)) {
       found.set(p.id, { id: p.id, name: p.name, position: p.position, team: p.team });
+      lineOf.set(p.id, lines.findIndex((l) => l.includes(` ${full} `)));
     }
   }
   // Abbreviated names ("J. Gibbs"): match initial + last name, using the team code
   // and position shown on the same line to pick between players who share a name.
   const POS_TOKENS: Record<string, Position> = { qb: "QB", rb: "RB", wr: "WR", te: "TE", k: "K" };
-  for (const line of lines) {
+  for (const [lineIdx, line] of lines.entries()) {
     const words = line.trim().split(" ");
     const linePos = new Set(words.map((w) => POS_TOKENS[w]).filter(Boolean));
     for (let i = 0; i < words.length - 1; i++) {
@@ -97,7 +107,10 @@ export async function matchRosterText(text: string) {
         if (!cands.length) continue;
         const fits = cands.filter((p) => (!p.team || line.includes(` ${p.team.toLowerCase()} `)) && (!linePos.size || linePos.has(p.position)));
         const pick = fits.length === 1 ? fits[0] : cands.length === 1 && !linePos.size ? cands[0] : null;
-        if (pick && !found.has(pick.id)) found.set(pick.id, { id: pick.id, name: pick.name, position: pick.position, team: pick.team });
+        if (pick && !found.has(pick.id)) {
+          found.set(pick.id, { id: pick.id, name: pick.name, position: pick.position, team: pick.team });
+          lineOf.set(pick.id, lineIdx);
+        }
         break;
       }
     }
@@ -107,6 +120,13 @@ export async function matchRosterText(text: string) {
     const nick = normalizeName(p.lastName);
     if (whole.includes(` ${normalizeName(p.name)} `) || new RegExp(` ${nick} (d\/st|d st|dst|def|defense) `).test(whole)) {
       found.set(p.id, { id: p.id, name: p.name, position: p.position, team: p.team });
+      lineOf.set(p.id, lines.findIndex((l) => l.includes(` ${nick} `)));
+    }
+  }
+  if (hasSlots) {
+    for (const m of found.values()) {
+      const i = lineOf.get(m.id);
+      if (i !== undefined && i >= 0) m.starter = !isBench(lines[i]);
     }
   }
   return [...found.values()];

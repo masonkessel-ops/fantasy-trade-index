@@ -58,8 +58,8 @@ export function TradeFinder({ team, players }: { team: SavedTeam; players: Playe
     <section className="card p-5">
       <h2 className="font-display text-xl font-bold uppercase tracking-wide">Trade finder</h2>
       <p className="mb-4 text-xs text-muted">
-        {team.league ? `Searches every roster in ${team.league.name}.` : "Searches every player on the value chart."} Trades are judged on trade power, so suggestions are ones the
-        other side could accept.
+        {team.league ? `Searches every roster in ${team.league.name}.` : "Searches every player on the value chart."} Ideas are ranked by value, how much they help your
+        starting lineup, and risk.
       </p>
 
       <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
@@ -83,7 +83,10 @@ export function TradeFinder({ team, players }: { team: SavedTeam; players: Playe
 
       {mode === "away" ? (
         <>
-          <p className="mb-2 text-sm text-muted">Pick up to 3 of your players you&apos;d move:</p>
+          <p className="mb-2 text-sm text-muted">Type or tap up to 3 of your players you&apos;d move:</p>
+          <div className="mb-3">
+            <PlayerSearch players={mine} exclude={away} onSelect={(p) => toggleAway(p.id)} placeholder="Type a player on your team…" />
+          </div>
           <div className="mb-4 flex flex-wrap gap-1.5">
             {mine.map((p) => {
               const on = away.includes(p.id);

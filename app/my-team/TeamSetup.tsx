@@ -489,7 +489,7 @@ async function toDataUrl(file: File): Promise<string> {
   return c.toDataURL("image/jpeg", 0.88);
 }
 
-type RosterResult = { teamName?: string | null; matched: { id: string; name: string }[]; unmatched: string[] };
+type RosterResult = { teamName?: string | null; matched: { id: string; name: string; starter?: boolean }[]; unmatched: string[] };
 
 function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; scoring: Scoring; onDone: (t: SavedTeam) => void }) {
   const [busy, setBusy] = useState(false);
@@ -528,6 +528,8 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
 
   if (result) {
     const ids = result.matched.map((m) => m.id).filter((id) => onBoard.has(id));
+    const knowsLineup = result.matched.some((m) => m.starter === false) && result.matched.some((m) => m.starter === true);
+    const starters = knowsLineup ? result.matched.filter((m) => m.starter && onBoard.has(m.id)).map((m) => m.id) : undefined;
     const offChart = result.matched.length - ids.length;
     return (
       <div>
@@ -539,9 +541,10 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
           scoring={scoring}
           onDone={onDone}
           initialIds={ids}
+          initialStarters={starters}
           initialName={result.teamName ?? ""}
           title="Check your roster"
-          subtitle={`We found ${result.matched.length} player${result.matched.length === 1 ? "" : "s"}. Remove any mistakes, add anyone we missed, then save.`}
+          subtitle={`We found ${result.matched.length} player${result.matched.length === 1 ? "" : "s"}${starters ? ` (${starters.length} starting)` : ""}. Remove any mistakes, add anyone we missed, then save.`}
           notice={
             (result.unmatched.length > 0 || offChart > 0) && (
               <p className="mb-3 rounded-xl bg-flame/10 px-3 py-2 text-xs text-flame">
@@ -617,6 +620,7 @@ function ManualBuilder({
   scoring,
   onDone,
   initialIds = [],
+  initialStarters,
   initialName = "",
   title = "Build your roster",
   subtitle = "Search and add each player on your team.",
@@ -626,6 +630,7 @@ function ManualBuilder({
   scoring: Scoring;
   onDone: (t: SavedTeam) => void;
   initialIds?: string[];
+  initialStarters?: string[];
   initialName?: string;
   title?: string;
   subtitle?: string;
@@ -706,6 +711,7 @@ function ManualBuilder({
                 playerIds: roster.map((p) => p.id),
                 rosterPositions: DEFAULT_ROSTER_POSITIONS,
                 directory: {},
+                starters: initialStarters?.filter((id) => ids.includes(id)),
                 updatedAt: Date.now(),
               })
             }
