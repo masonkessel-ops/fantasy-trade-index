@@ -76,7 +76,7 @@ All imported players are matched to Sleeper player IDs by name, position and NFL
 1. Go to [developer.yahoo.com/apps/create](https://developer.yahoo.com/apps/create/) and create an app:
    - **Application Type:** Web Application
    - **Redirect URI(s):** `https://YOUR-SITE.vercel.app/api/yahoo/callback` (Yahoo requires https, so set this up on your Vercel deployment)
-   - **API Permissions:** Fantasy Sports → **Read**. Optionally, OpenID Connect → Profile, so the site can show your name.
+   - **API Permissions:** check **Fantasy Sports - Read**. This has to be checked when you create the app: Yahoo doesn't let you add permissions to an existing app.
 2. Copy the **Client ID** and **Client Secret**.
 3. In Vercel → Settings → Environment Variables, add `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, and `SESSION_SECRET` (any long random string, e.g. from `openssl rand -base64 32`). Redeploy.
 
