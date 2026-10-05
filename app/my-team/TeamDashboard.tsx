@@ -17,6 +17,7 @@ import { SCORINGS, type PlayerValue, type Position, type Scoring } from "@/lib/t
 import { Avatar } from "./TeamSetup";
 import { LeagueError, refetchLeague, teamFromLeague } from "./leagueClient";
 import { GamePlan } from "./GamePlan";
+import { TradeFinder } from "./TradeFinder";
 
 const PROVIDER_LABEL: Record<string, string> = { sleeper: "Sleeper", espn: "ESPN", yahoo: "Yahoo" };
 
@@ -182,6 +183,8 @@ export function TeamDashboard({
       </div>
 
       <GamePlan team={team} players={players} scoring={scoring} />
+
+      <TradeFinder team={team} players={players} />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-5">
         {/* Position strength */}

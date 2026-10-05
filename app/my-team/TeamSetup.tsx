@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import clsx from "clsx";
-import { ArrowRight, ChevronDown, ChevronLeft, Hammer, Loader2, LogOut, Trash2 } from "lucide-react";
+import { ArrowRight, Camera, ChevronDown, ChevronLeft, ClipboardPaste, Hammer, ImageUp, Loader2, LogOut, Trash2 } from "lucide-react";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { ScoringToggle, setScoringCookie } from "@/components/ScoringToggle";
@@ -12,12 +12,13 @@ import { DEFAULT_ROSTER_POSITIONS, scoringFromRec, type SavedTeam } from "@/lib/
 import { SCORINGS, type PlayerValue, type Scoring } from "@/lib/types";
 import { LeagueError, fetchEspnLeague, fetchSleeperLeague, fetchYahooLeague, teamFromLeague, type LeagueResponse } from "./leagueClient";
 
-type Mode = "sleeper" | "yahoo" | "espn" | "manual";
+type Mode = "sleeper" | "yahoo" | "espn" | "photo" | "manual";
 
 const TABS: { id: Mode; label: string; short: string }[] = [
   { id: "sleeper", label: "Sleeper", short: "Sleeper" },
   { id: "yahoo", label: "Yahoo", short: "Yahoo" },
   { id: "espn", label: "ESPN", short: "ESPN" },
+  { id: "photo", label: "Photo / Paste", short: "Photo" },
   { id: "manual", label: "Build manually", short: "Manual" },
 ];
 
@@ -48,7 +49,7 @@ export function TeamSetup({
 
   return (
     <div className="card animate-rise overflow-hidden [animation-delay:80ms]">
-      <div className="grid grid-cols-4 border-b border-line p-1.5">
+      <div className="grid grid-cols-5 border-b border-line p-1.5">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -61,9 +62,10 @@ export function TeamSetup({
             {mode === t.id && (
               <motion.span layoutId="setup-tab" className="absolute inset-0 rounded-xl bg-surface-3" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
             )}
-            {t.id === "manual" && <Hammer className="relative size-4" />}
-            <span className="relative hidden sm:inline">{t.label}</span>
-            <span className="relative sm:hidden">{t.short}</span>
+            {t.id === "manual" && <Hammer className="relative hidden size-4 lg:block" />}
+            {t.id === "photo" && <Camera className="relative hidden size-4 lg:block" />}
+            <span className="relative hidden lg:inline">{t.label}</span>
+            <span className="relative text-xs sm:text-sm lg:hidden">{t.short}</span>
           </button>
         ))}
       </div>
@@ -73,6 +75,7 @@ export function TeamSetup({
             {mode === "sleeper" && <SleeperImport onFinish={finish} />}
             {mode === "yahoo" && <YahooImport onFinish={finish} />}
             {mode === "espn" && <EspnImport onFinish={finish} />}
+            {mode === "photo" && <PhotoImport players={players} scoring={scoring} onDone={onDone} />}
             {mode === "manual" && <ManualBuilder players={players} scoring={scoring} onDone={onDone} />}
           </motion.div>
         </AnimatePresence>
@@ -460,27 +463,185 @@ function EspnImport({ onFinish }: { onFinish: Finish }) {
   );
 }
 
+/* ----------------------------------------------------------- Photo / Paste */
+
+/** Shrink big screenshots before upload (keeps requests small and fast). */
+async function toDataUrl(file: File): Promise<string> {
+  const raw = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error("Couldn't read that file."));
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("That file isn't an image."));
+    i.src = raw;
+  });
+  const MAX = 2000;
+  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+  if (scale === 1 && file.size < 3_500_000 && /image\/(png|jpeg|webp)/.test(file.type)) return raw;
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.88);
+}
+
+type RosterResult = { teamName?: string | null; matched: { id: string; name: string }[]; unmatched: string[] };
+
+function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; scoring: Scoring; onDone: (t: SavedTeam) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<RosterResult | null>(null);
+  const onBoard = new Set(players.map((p) => p.id));
+
+  async function send(url: string, body: object) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
+      if (!data.matched?.length) throw new Error("No players found. Try a clearer screenshot that shows your whole roster.");
+      setResult(data);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onFile(file: File | undefined) {
+    if (!file) return;
+    try {
+      const dataUrl = await toDataUrl(file);
+      setPreview(dataUrl);
+      await send("/api/roster/photo", { image: dataUrl });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  if (result) {
+    const ids = result.matched.map((m) => m.id).filter((id) => onBoard.has(id));
+    const offChart = result.matched.length - ids.length;
+    return (
+      <div>
+        <button onClick={() => setResult(null)} className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
+          <ChevronLeft className="size-4" /> Try another
+        </button>
+        <ManualBuilder
+          players={players}
+          scoring={scoring}
+          onDone={onDone}
+          initialIds={ids}
+          initialName={result.teamName ?? ""}
+          title="Check your roster"
+          subtitle={`We found ${result.matched.length} player${result.matched.length === 1 ? "" : "s"}. Remove any mistakes, add anyone we missed, then save.`}
+          notice={
+            (result.unmatched.length > 0 || offChart > 0) && (
+              <p className="mb-3 rounded-xl bg-flame/10 px-3 py-2 text-xs text-flame">
+                {result.unmatched.length > 0 && <>Couldn&apos;t match: {result.unmatched.join(", ")}. Add them with the search box. </>}
+                {offChart > 0 && <>{offChart} deep-bench player{offChart > 1 ? "s aren't" : " isn't"} on the value chart and {offChart > 1 ? "were" : "was"} left out.</>}
+              </p>
+            )
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="font-display text-2xl font-bold uppercase">Import from a photo</h3>
+      <p className="mb-4 text-sm text-muted">
+        Take a screenshot of your team page in any fantasy app (Yahoo, ESPN, NFL.com…) and upload it. We&apos;ll read the players and build your team.
+      </p>
+      <label
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          onFile(e.dataTransfer.files?.[0]);
+        }}
+        className={clsx(
+          "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line-strong bg-surface-2 px-4 py-8 text-center transition hover:border-rocket/50",
+          busy && "pointer-events-none opacity-70",
+        )}
+      >
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element -- local preview of the user's own upload
+          <img src={preview} alt="Your screenshot" className="max-h-40 rounded-lg object-contain opacity-80" />
+        ) : (
+          <ImageUp className="size-8 text-rocket" />
+        )}
+        <span className="text-sm font-semibold">
+          {busy ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" /> Reading your roster…
+            </span>
+          ) : (
+            "Tap to choose a screenshot, or drop it here"
+          )}
+        </span>
+        <span className="text-xs text-faint">PNG, JPG or WEBP</span>
+        <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+      </label>
+
+      <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-faint">
+        <span className="h-px flex-1 bg-line" /> or paste it <span className="h-px flex-1 bg-line" />
+      </div>
+      <p className="mb-2 text-sm text-muted">On your team page, select all (⌘A / Ctrl+A), copy, and paste here. This doesn&apos;t use AI.</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={4}
+        placeholder="Paste your roster page here…"
+        className="w-full rounded-xl border border-line bg-surface-2 p-3 text-sm outline-none placeholder:text-faint focus:border-rocket/50"
+      />
+      <button onClick={() => send("/api/roster/text", { text })} disabled={busy || text.trim().length < 3} className={clsx(primaryBtn, "mt-2")}>
+        <ClipboardPaste className="size-4" /> Find my players
+      </button>
+      <ErrorNote error={error} />
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- Manual */
 
 function ManualBuilder({
   players,
   scoring,
   onDone,
+  initialIds = [],
+  initialName = "",
+  title = "Build your roster",
+  subtitle = "Search and add each player on your team.",
+  notice,
 }: {
   players: PlayerValue[];
   scoring: Scoring;
   onDone: (t: SavedTeam) => void;
+  initialIds?: string[];
+  initialName?: string;
+  title?: string;
+  subtitle?: string;
+  notice?: React.ReactNode;
 }) {
-  const [name, setName] = useState("");
-  const [ids, setIds] = useState<string[]>([]);
+  const [name, setName] = useState(initialName);
+  const [ids, setIds] = useState<string[]>(initialIds);
   const byId = new Map(players.map((p) => [p.id, p]));
   const roster = ids.map((id) => byId.get(id)).filter((p): p is PlayerValue => !!p);
   const total = roster.reduce((s, p) => s + p.value, 0);
 
   return (
     <div>
-      <h3 className="font-display text-2xl font-bold uppercase">Build your roster</h3>
-      <p className="mb-4 text-sm text-muted">Search and add each player on your team.</p>
+      <h3 className="font-display text-2xl font-bold uppercase">{title}</h3>
+      <p className="mb-4 text-sm text-muted">{subtitle}</p>
+      {notice}
       <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
         <input
           value={name}

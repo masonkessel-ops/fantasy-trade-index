@@ -14,7 +14,7 @@ Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**
 | **AI Assistant** (`/assistant`) | Chat with Claude about trades. It gets your roster, league scoring and live trade values, streams its answer, and returns 2–3 trade ideas as cards that open in the analyzer |
 | **Live Tracker** (`/live`) | Refreshes every 60s: top scorers by position, booms and busts vs. projection, and a scoreboard with each game's top fantasy performers |
 | **Team of the Week** (`/team-of-the-week`) | The highest-scoring possible lineup (QB, 2 RB, 2 WR, TE, FLEX, K, DST) on a football-field graphic, with a week picker |
-| **My Team** (`/my-team`) | Import your team from **Sleeper**, **Yahoo** (sign in) or **ESPN** (league ID; private leagues via cookies), or build one by hand. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
+| **My Team** (`/my-team`) | Import your team from **Sleeper**, **Yahoo** (sign in), **ESPN** (league ID; private leagues via cookies), a **screenshot** of any fantasy app (read by Claude), **pasted** roster text, or build one by hand. Includes a **Trade finder**: pick players to trade away and see what you could get, or pick a player you want and see what to offer. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
 
 PPR, Half-PPR and Standard scoring are supported everywhere (toggle in the sidebar or header). Importing a Sleeper league switches to that league's format.
 
@@ -66,6 +66,11 @@ On **My Team**, [`lib/advice.ts`](lib/advice.ts) builds:
 - **Trades you should make:** every 1-for-1, 2-for-1 and 1-for-2 deal with each team in your league that's fair by trade value, raises your starting-lineup value, and doesn't gut theirs. All of this is pure math, so it's free to run.
 
 The thresholds (`MIN_LINEUP_GAIN`, `MAX_PARTNER_LOSS`, `MIN_PICKUP_GAIN`…) are at the top of that file.
+
+## Importing from a photo or pasted text
+
+- **Photo** ([`app/api/roster/photo/route.ts`](app/api/roster/photo/route.ts)): upload a screenshot of your team page from any app. Claude reads the player names (structured output), and [`lib/rosterMatch.ts`](lib/rosterMatch.ts) matches them to our players, including abbreviations like "J. Gibbs". This needs `ANTHROPIC_API_KEY`, and it's limited to 10 uploads per hour per visitor.
+- **Paste** ([`app/api/roster/text/route.ts`](app/api/roster/text/route.ts)): copy your whole team page and paste it. Names are matched locally, with no AI, so it's free.
 
 ## Importing from Yahoo and ESPN
 
