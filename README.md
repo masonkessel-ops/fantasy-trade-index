@@ -1,4 +1,4 @@
-# TradeRocket 🚀
+# Fantasy Trade Index 📈
 
 A fantasy football trade companion: live 1–100 trade values, a trade analyzer, an AI trade assistant powered by Claude, a live weekly tracker and a Team of the Week, all with a dark, mobile-friendly UI.
 
@@ -81,7 +81,7 @@ Related settings:
    ```
 
    ```bash
-   git commit -m "TradeRocket"
+   git commit -m "Fantasy Trade Index"
    ```
 
    Then create an empty repo on GitHub and follow its "push an existing repository" instructions.

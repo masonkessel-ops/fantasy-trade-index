@@ -14,7 +14,7 @@ const barlow = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: { default: "TradeRocket — Fantasy Football Trade Values", template: "%s · TradeRocket" },
+  title: { default: "Fantasy Trade Index — Fantasy Football Trade Values", template: "%s · Fantasy Trade Index" },
   description: "Live fantasy football trade values, trade analyzer, AI trade assistant and weekly tracker.",
 };
 

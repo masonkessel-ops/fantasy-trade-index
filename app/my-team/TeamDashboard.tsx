@@ -123,7 +123,7 @@ export function TeamDashboard({
           )}
           <button
             onClick={() => {
-              if (confirm("Remove this team from TradeRocket? (Your Sleeper league is not affected.)")) onChange(null);
+              if (confirm("Remove this team from Fantasy Trade Index? (Your Sleeper league is not affected.)")) onChange(null);
             }}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:border-down/40 hover:text-down"
           >

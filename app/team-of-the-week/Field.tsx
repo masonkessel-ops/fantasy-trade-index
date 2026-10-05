@@ -74,7 +74,7 @@ function FieldView({
       </div>
       <div className={clsx("absolute flex items-center justify-center bg-gradient-to-br from-[#123] to-[#0a1a2a]", land ? "inset-y-0 right-0 w-[8%]" : "inset-x-0 top-0 h-[7%]")}>
         <span className={clsx("font-display text-sm font-extrabold uppercase italic tracking-[0.3em] text-white/80 sm:text-lg", land && "rotate-90 whitespace-nowrap")}>
-          Rocket
+          Index
         </span>
       </div>
       {/* yard lines */}
