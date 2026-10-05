@@ -104,3 +104,9 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Grid items default to min-width:auto, which lets long rows (chip strips,
+   truncated names) push a single-column grid wider than a phone screen. */
+.grid > * {
+  min-width: 0;
+}

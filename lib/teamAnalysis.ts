@@ -1,7 +1,7 @@
 import type { PlayerValue, Position } from "./types";
 
 /** Sleeper roster slot names -> which positions can fill them. */
-const SLOT_ELIGIBLE: Record<string, Position[]> = {
+export const SLOT_ELIGIBLE: Record<string, Position[]> = {
   QB: ["QB"],
   RB: ["RB"],
   WR: ["WR"],
@@ -27,11 +27,18 @@ export interface LineupSlot {
   player: PlayerValue | null;
 }
 
-/** Best possible starting lineup by trade value: fill fixed slots first, then flex. */
-export function bestLineup(players: PlayerValue[], rosterPositions: string[]) {
+/**
+ * Best possible starting lineup: fill fixed slots first, then flex.
+ * Ranks by trade value unless another `score` is given (e.g. this week's projection).
+ */
+export function bestLineup(
+  players: PlayerValue[],
+  rosterPositions: string[],
+  score: (p: PlayerValue) => number = (p) => p.value,
+) {
   const slots = rosterPositions.filter((s) => SLOT_ELIGIBLE[s]);
   const ordered = [...slots].sort((a, b) => SLOT_ELIGIBLE[a].length - SLOT_ELIGIBLE[b].length);
-  const pool = [...players].sort((a, b) => b.value - a.value);
+  const pool = [...players].sort((a, b) => score(b) - score(a));
   const used = new Set<string>();
   const filled = new Map<number, PlayerValue | null>();
   ordered.forEach((slot) => {

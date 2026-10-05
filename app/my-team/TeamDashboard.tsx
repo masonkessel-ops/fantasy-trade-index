@@ -15,6 +15,7 @@ import { SLOT_LABEL, analyzeTeam, gradeColor } from "@/lib/teamAnalysis";
 import { POS_COLOR } from "@/lib/ui";
 import { SCORINGS, type PlayerValue, type Position, type Scoring } from "@/lib/types";
 import { Avatar, fetchLeague, teamFromLeague } from "./TeamSetup";
+import { GamePlan } from "./GamePlan";
 
 export function TeamDashboard({
   team,
@@ -175,7 +176,9 @@ export function TeamDashboard({
         </Kpi>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-5">
+      <GamePlan team={team} players={players} scoring={scoring} />
+
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-5">
         {/* Position strength */}
         <section className="card animate-rise p-5 [animation-delay:200ms] lg:col-span-3">
           <h2 className="font-display text-xl font-bold uppercase tracking-wide">Position strength</h2>
@@ -237,7 +240,7 @@ export function TeamDashboard({
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
         {/* Lineup */}
         <section className="card animate-rise p-5 [animation-delay:260ms]">
           <h2 className="mb-3 font-display text-xl font-bold uppercase tracking-wide">Best lineup</h2>

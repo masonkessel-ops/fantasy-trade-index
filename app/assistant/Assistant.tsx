@@ -7,9 +7,8 @@ import clsx from "clsx";
 import { ArrowRight, ArrowUp, Bot, KeyRound, RotateCcw, Sparkles, Square, Users } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { Markdown } from "@/components/Markdown";
-import { PlayerAvatar } from "@/components/PlayerBits";
+import { TradeIdeaCard } from "@/components/TradeIdeaCard";
 import { useMyTeam, type SavedTeam } from "@/lib/myTeam";
-import { evaluateTrade } from "@/lib/tradeAnalysis";
 import { SCORINGS, type PlayerValue, type Scoring } from "@/lib/types";
 
 interface Trade {
@@ -308,62 +307,18 @@ function Message({ m, board, team }: { m: ChatMessage; board: Map<string, Player
   );
 }
 
-const VERDICT = {
-  win: { label: "You win", cls: "bg-up/15 text-up" },
-  fair: { label: "Fair", cls: "bg-volt/15 text-volt" },
-  lose: { label: "You lose", cls: "bg-down/15 text-down" },
-  empty: { label: "–", cls: "bg-white/5 text-muted" },
-} as const;
-
 function TradeCard({ trade, board, team, index }: { trade: Trade; board: Map<string, PlayerValue>; team: SavedTeam | null; index: number }) {
-  const give = trade.give.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p);
-  const get = trade.get.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p);
-  const r = evaluateTrade(give, get);
   const partner = team?.league?.teams.find((t) => t.teamName.toLowerCase() === trade.partner?.toLowerCase());
-  const href = `/trade?give=${trade.give.join(",")}&get=${trade.get.join(",")}${partner ? `&partner=${partner.rosterId}` : ""}`;
-  const v = VERDICT[r.verdict];
   return (
-    <motion.div initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: index * 0.08 }}>
-      <Link
-        href={href}
-        className="group flex h-full flex-col rounded-2xl border border-line-strong bg-gradient-to-b from-surface-2 to-surface p-4 transition hover:-translate-y-0.5 hover:border-rocket/50 hover:shadow-[0_12px_40px_-16px] hover:shadow-rocket/50"
-      >
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate font-display text-lg font-bold uppercase leading-tight">{trade.title}</div>
-            {trade.partner && <div className="truncate text-xs text-muted">with {trade.partner}</div>}
-          </div>
-          <span className={clsx("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold", v.cls)}>{v.label}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Side label="You give" players={give} total={r.adjGive} color="text-rocket" />
-          <Side label="You get" players={get} total={r.adjGet} color="text-volt" />
-        </div>
-        {trade.why && <p className="mt-3 text-xs leading-relaxed text-muted">{trade.why}</p>}
-        <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-rocket">
-          Open in Trade Analyzer <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
-        </span>
-      </Link>
-    </motion.div>
-  );
-}
-
-function Side({ label, players, total, color }: { label: string; players: PlayerValue[]; total: number; color: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="mb-1.5 flex items-baseline justify-between">
-        <span className={clsx("text-[10px] font-bold uppercase tracking-wider", color)}>{label}</span>
-        <span className="font-display text-base font-bold tabular">{total}</span>
-      </div>
-      <ul className="space-y-1.5">
-        {players.map((p) => (
-          <li key={p.id} className="flex items-center gap-1.5">
-            <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={22} />
-            <span className="min-w-0 flex-1 truncate text-xs font-medium">{p.name}</span>
-            <span className="text-[11px] text-muted tabular">{p.value}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <TradeIdeaCard
+      title={trade.title}
+      subtitle={trade.partner ? `with ${trade.partner}` : null}
+      give={trade.give}
+      get={trade.get}
+      board={board}
+      partnerRosterId={partner?.rosterId}
+      note={trade.why}
+      index={index}
+    />
   );
 }
