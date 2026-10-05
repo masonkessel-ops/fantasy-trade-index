@@ -12,6 +12,7 @@ import { WEIGHTS, valueTier } from "@/lib/tradeValue";
 import { getPlayers } from "@/lib/sleeper";
 import { statLine } from "@/lib/statLine";
 import { PlayerRiskLine } from "./PlayerRiskLine";
+import { PlayerTradeButtons } from "./PlayerTradeButtons";
 
 export async function generateMetadata({ params }: PageProps<"/players/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -109,7 +110,13 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
         </div>
 
         {value && (
-          <div className="relative mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="relative mt-5">
+            <PlayerTradeButtons id={player.id} name={player.name} />
+          </div>
+        )}
+
+        {value && (
+          <div className="relative mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Kpi label="Points / game" value={value.ppg} sub={`${value.gamesPlayed} games`} />
             <Kpi label="Last 3 games" value={value.recentPpg ?? "–"} sub="per game" />
             <Kpi label="ROS projection" value={value.rosPpg} sub={`${value.rosPoints} pts left`} />

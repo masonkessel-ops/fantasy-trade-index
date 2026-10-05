@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import clsx from "clsx";
@@ -17,7 +17,8 @@ import { SCORINGS, type PlayerValue, type Position, type Scoring } from "@/lib/t
 import { Avatar } from "./TeamSetup";
 import { LeagueError, refetchLeague, teamFromLeague } from "./leagueClient";
 import { GamePlan } from "./GamePlan";
-import { TradeFinder } from "./TradeFinder";
+import { TradeFinder, type FinderMode } from "./TradeFinder";
+import { PlayerSheet, type PlayerWeek } from "./PlayerSheet";
 
 const PROVIDER_LABEL: Record<string, string> = { sleeper: "Sleeper", espn: "ESPN", yahoo: "Yahoo" };
 
@@ -26,15 +27,50 @@ export function TeamDashboard({
   players,
   scoring,
   onChange,
+  finderPreset,
 }: {
   team: SavedTeam;
   players: PlayerValue[];
   scoring: Scoring;
   onChange: (t: SavedTeam | null) => void;
+  /** open the trade finder pre-filled (from a player card or a player page link) */
+  finderPreset?: { mode: FinderMode; ids: string[] } | null;
 }) {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [preset, setPreset] = useState<{ mode: FinderMode; ids: string[]; nonce: number } | null>(finderPreset ? { ...finderPreset, nonce: 1 } : null);
+
+  // This week's points for everyone on the roster (actual once games start, projected before).
+  const idsKey = team.playerIds.join(",");
+  const [weekData, setWeekData] = useState<{ key: string; week: number | null; points: Record<string, PlayerWeek> } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const key = `${idsKey}|${scoring}`;
+    fetch(`/api/week-points?ids=${idsKey}&scoring=${scoring}`)
+      .then((r) => r.json())
+      .then((d) => !cancelled && setWeekData({ key, week: d.week, points: d.points ?? {} }))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [idsKey, scoring]);
+  const pointsOf = (id: string) => weekData?.points[id];
+  const scoreOf = (id: string) => {
+    const w = pointsOf(id);
+    return w ? (w.actual ?? w.projected ?? 0) : 0;
+  };
+
+  useEffect(() => {
+    if (finderPreset) document.getElementById("trade-finder")?.scrollIntoView({ behavior: "smooth" });
+  }, [finderPreset]);
+
+  function tradeAway(id: string) {
+    setSheetId(null);
+    setPreset({ mode: "away", ids: [id], nonce: Date.now() });
+    setTimeout(() => document.getElementById("trade-finder")?.scrollIntoView({ behavior: "smooth" }), 50);
+  }
   const board = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
   const roster = team.playerIds.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p);
@@ -206,7 +242,22 @@ export function TeamDashboard({
 
       <GamePlan team={team} players={players} scoring={scoring} />
 
-      <TradeFinder team={team} players={players} />
+      <TradeFinder
+        key={preset?.nonce ?? 0}
+        team={team}
+        players={players}
+        initialMode={preset?.mode}
+        initialAway={preset?.mode === "away" ? preset.ids : []}
+        initialWant={preset?.mode === "for" ? preset.ids : []}
+      />
+
+      <PlayerSheet
+        player={sheetId ? (board.get(sheetId) ?? null) : null}
+        week={sheetId ? pointsOf(sheetId) : undefined}
+        weekNumber={weekData?.week ?? null}
+        onClose={() => setSheetId(null)}
+        onTradeAway={tradeAway}
+      />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-5">
         {/* Position strength */}
@@ -275,7 +326,7 @@ export function TeamDashboard({
         <section className="card animate-rise p-5 [animation-delay:260ms]">
           <div className="mb-1 flex items-baseline justify-between">
             <h2 className="font-display text-xl font-bold uppercase tracking-wide">Starting lineup</h2>
-            <span className="text-xs text-faint">{currentStarterIds.length} starting</span>
+            <PointsTotal ids={currentStarterIds} scoreOf={scoreOf} points={weekData?.points} week={weekData?.week ?? null} />
           </div>
           <p className="mb-3 text-xs text-muted">{lineupNote}</p>
           <ul className="space-y-1.5">
@@ -285,6 +336,8 @@ export function TeamDashboard({
                 {s.player ? (
                   <RosterRow
                     p={s.player}
+                    week={pointsOf(s.player.id)}
+                    onOpen={() => setSheetId(s.player!.id)}
                     move={canEditLineup ? { label: "Bench", onClick: () => moveToBench(s.player!.id) } : undefined}
                     onRemove={team.source === "manual" ? () => setPlayers(team.playerIds.filter((id) => id !== s.player!.id)) : undefined}
                   />
@@ -299,7 +352,7 @@ export function TeamDashboard({
         <section className="card animate-rise p-5 [animation-delay:300ms]">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="font-display text-xl font-bold uppercase tracking-wide">Bench</h2>
-            <span className="text-xs text-faint">{benchList.length + offChart.length} on bench</span>
+            <PointsTotal ids={benchList.map((p) => p.id)} scoreOf={scoreOf} points={weekData?.points} week={weekData?.week ?? null} muted />
           </div>
           {team.source === "manual" && (
             <div className="mb-3">
@@ -311,6 +364,8 @@ export function TeamDashboard({
               <li key={p.id} className="flex items-center gap-3 rounded-xl px-3 py-1.5">
                 <RosterRow
                   p={p}
+                  week={pointsOf(p.id)}
+                  onOpen={() => setSheetId(p.id)}
                   move={canEditLineup ? { label: "Start", onClick: () => moveToStart(p.id) } : undefined}
                   onRemove={team.source === "manual" ? () => setPlayers(team.playerIds.filter((id) => id !== p.id)) : undefined}
                 />
@@ -423,21 +478,62 @@ function Callout({
   );
 }
 
-function RosterRow({ p, onRemove, move }: { p: PlayerValue; onRemove?: () => void; move?: { label: string; onClick: () => void } }) {
+function RosterRow({
+  p,
+  onRemove,
+  move,
+  week,
+  onOpen,
+}: {
+  p: PlayerValue;
+  onRemove?: () => void;
+  move?: { label: string; onClick: () => void };
+  week?: PlayerWeek;
+  onOpen?: () => void;
+}) {
+  const body = (
+    <>
+      <PlayerAvatar id={p.id} position={p.position as Position} team={p.team} name={p.name} size={32} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-semibold">{p.name}</span>
+          <InjuryTag status={p.injuryStatus} />
+        </span>
+        <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
+          <PosBadge pos={p.position} /> {p.team}
+          {week?.opponent && <span className="text-faint">{week.opponent}</span>}
+        </span>
+      </span>
+      {week && (
+        <span className="w-14 shrink-0 text-right">
+          {week.state === "bye" ? (
+            <span className="text-xs font-bold text-down">BYE</span>
+          ) : week.actual != null ? (
+            <>
+              <span className="block font-display text-lg font-bold leading-none tabular">{week.actual}</span>
+              <span className={clsx("text-[10px]", week.state === "live" ? "text-down" : "text-faint")}>{week.state === "live" ? "● live" : `proj ${week.projected ?? "–"}`}</span>
+            </>
+          ) : (
+            <>
+              <span className="block font-display text-lg font-bold leading-none text-muted tabular">{week.projected ?? "–"}</span>
+              <span className="text-[10px] text-faint">proj</span>
+            </>
+          )}
+        </span>
+      )}
+    </>
+  );
   return (
     <>
-      <Link href={`/players/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <PlayerAvatar id={p.id} position={p.position as Position} team={p.team} name={p.name} size={32} />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-semibold">{p.name}</span>
-            <InjuryTag status={p.injuryStatus} />
-          </span>
-          <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
-            <PosBadge pos={p.position} /> {p.team} · {p.ppg} ppg
-          </span>
-        </span>
-      </Link>
+      {onOpen ? (
+        <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          {body}
+        </button>
+      ) : (
+        <Link href={`/players/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+          {body}
+        </Link>
+      )}
       <ValueBadge value={p.value} size="sm" />
       {move && (
         <button
@@ -453,5 +549,33 @@ function RosterRow({ p, onRemove, move }: { p: PlayerValue; onRemove?: () => voi
         </button>
       )}
     </>
+  );
+}
+
+/** "112.4 pts · 98.1 so far" header total for a group of players. */
+function PointsTotal({
+  ids,
+  scoreOf,
+  points,
+  week,
+  muted,
+}: {
+  ids: string[];
+  scoreOf: (id: string) => number;
+  points?: Record<string, PlayerWeek>;
+  week: number | null;
+  muted?: boolean;
+}) {
+  if (!points) return <span className="text-xs text-faint">{ids.length} players</span>;
+  const total = Math.round(ids.reduce((s, id) => s + scoreOf(id), 0) * 10) / 10;
+  const anyStarted = ids.some((id) => points[id]?.actual != null);
+  return (
+    <span className="text-right">
+      <span className={clsx("font-display text-xl font-bold tabular", muted ? "text-muted" : "text-gradient")}>{total}</span>
+      <span className="ml-1 text-[11px] text-faint">
+        pts {anyStarted ? "(actual + proj)" : "proj"}
+        {week ? ` · wk ${week}` : ""}
+      </span>
+    </span>
   );
 }

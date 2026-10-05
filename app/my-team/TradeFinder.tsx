@@ -11,14 +11,27 @@ import type { SavedTeam } from "@/lib/myTeam";
 import { findOffers, shopPlayers, type FinderPool } from "@/lib/tradeFinder";
 import type { PlayerValue } from "@/lib/types";
 
-type Mode = "away" | "for";
+export type FinderMode = "away" | "for";
+type Mode = FinderMode;
 
-export function TradeFinder({ team, players }: { team: SavedTeam; players: PlayerValue[] }) {
+export function TradeFinder({
+  team,
+  players,
+  initialMode = "away",
+  initialAway = [],
+  initialWant = [],
+}: {
+  team: SavedTeam;
+  players: PlayerValue[];
+  initialMode?: Mode;
+  initialAway?: string[];
+  initialWant?: string[];
+}) {
   const board = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
   const mine = useMemo(() => team.playerIds.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p).sort((a, b) => b.value - a.value), [team, board]);
-  const [mode, setMode] = useState<Mode>("away");
-  const [away, setAway] = useState<string[]>([]);
-  const [want, setWant] = useState<string[]>([]);
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [away, setAway] = useState<string[]>(initialAway);
+  const [want, setWant] = useState<string[]>(initialWant);
   const dAway = useDeferredValue(away);
   const dWant = useDeferredValue(want);
 
@@ -55,7 +68,7 @@ export function TradeFinder({ team, players }: { team: SavedTeam; players: Playe
   }, [team, pools, players]);
 
   return (
-    <section className="card p-5">
+    <section id="trade-finder" className="card scroll-mt-20 p-5">
       <h2 className="font-display text-xl font-bold uppercase tracking-wide">Trade finder</h2>
       <p className="mb-4 text-xs text-muted">
         {team.league ? `Searches every roster in ${team.league.name}.` : "Searches every player on the value chart."} Ideas are ranked by value, how much they help your
