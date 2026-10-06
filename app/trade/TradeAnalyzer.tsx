@@ -264,7 +264,7 @@ function SidePanel({
           <p className="text-xs text-muted">{subtitle}</p>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint" title="What the trade market pays for this side. Stars count for much more than their 1–100 value suggests, and extra players count for a little less.">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint" title="What the trade market pays for this side. Stars count for much more than their 1–100 value suggests. The side getting fewer players also gets credit for the roster spots it saves.">
             Trade weight
           </div>
           <CountUp value={adjusted} className="font-display text-3xl font-bold tabular" />

@@ -99,7 +99,8 @@ function rosterCheck(give: PlayerValue[], get: PlayerValue[], mine: PlayerValue[
   return { lineupGain: Math.round(after.value - before.value), theirGain, theirConcern };
 }
 
-export function shopPlayers(give: PlayerValue[], mine: PlayerValue[], pools: FinderPool[], rosterPositions: string[], limit = 9): FinderIdea[] {
+/** `getCount`: only deals where you get back exactly this many players (e.g. 2 for a 1-for-2). */
+export function shopPlayers(give: PlayerValue[], mine: PlayerValue[], pools: FinderPool[], rosterPositions: string[], limit = 9, getCount: number | null = null): FinderIdea[] {
   if (!give.length) return [];
   const mineIds = new Set(mine.map((p) => p.id));
   const givePower = give.reduce((s, p) => s + p.power, 0);
@@ -113,8 +114,10 @@ export function shopPlayers(give: PlayerValue[], mine: PlayerValue[], pools: Fin
       .sort((a, b) => b.power - a.power)
       .slice(0, market ? 90 : 18);
     const perPartner: (FinderIdea & { score: number })[] = [];
-    for (const size of [1, 2]) {
-      for (const get of combos(size === 1 ? cands : cands.slice(0, market ? 45 : 18), size)) {
+    const sizes = getCount ? [getCount] : [1, 2];
+    for (const size of sizes) {
+      const top = size === 1 ? cands : cands.slice(0, size === 2 ? (market ? 45 : 18) : market ? 24 : 14);
+      for (const get of combos(top, size)) {
         const t = evaluateTrade(give, get);
         if (t.balance < -MAX_SHOP_DISCOUNT || t.balance > MAX_EDGE) continue;
         const r = rosterCheck(give, get, mine, rosterPositions, pool, true);
@@ -137,17 +140,18 @@ export function shopPlayers(give: PlayerValue[], mine: PlayerValue[], pools: Fin
     }
     perPartner.sort((a, b) => b.score - a.score);
     if (!market) ideas.push(...perPartner.slice(0, 2));
-    else for (const n of [1, 2]) ideas.push(...perPartner.filter((i) => i.get.length === n).slice(0, limit * 2));
+    else for (const n of sizes) ideas.push(...perPartner.filter((i) => i.get.length === n).slice(0, limit * 2));
   }
   return dedupe(ideas, limit);
 }
 
-export function findOffers(target: PlayerValue[], mine: PlayerValue[], rosterPositions: string[], partner: FinderPool | null, limit = 6): FinderIdea[] {
+/** `giveCount`: only offers of exactly this many of your players (e.g. 2 for a 2-for-1). */
+export function findOffers(target: PlayerValue[], mine: PlayerValue[], rosterPositions: string[], partner: FinderPool | null, limit = 6, giveCount: number | null = null): FinderIdea[] {
   if (!target.length) return [];
   const wantsSpecial = target.some((p) => !isFlexPos(p));
   const pool = mine.filter((p) => wantsSpecial || isFlexPos(p)).sort((a, b) => b.power - a.power).slice(0, 14);
   const ideas: (FinderIdea & { score: number })[] = [];
-  for (const size of [1, 2, 3]) {
+  for (const size of giveCount ? [giveCount] : [1, 2, 3]) {
     for (const give of combos(pool, size)) {
       const t = evaluateTrade(give, target);
       // They need to see it as fair (or a small win for them); don't overpay a lot.
@@ -170,6 +174,82 @@ export function findOffers(target: PlayerValue[], mine: PlayerValue[], rosterPos
     }
   }
   return dedupe(ideas, limit, "give");
+}
+
+export interface DealShape {
+  give: number;
+  get: number;
+}
+
+/**
+ * "Show me good 2-for-1s": every fair deal of one shape between your roster and the
+ * other rosters (or the whole chart), best fit for your lineup first. Consolidation
+ * deals (2-for-1, 3-for-1) must bring back someone better than anyone you send;
+ * splits (1-for-2, 1-for-3) must send someone better than anyone you get.
+ */
+export function packageDeals(mine: PlayerValue[], pools: FinderPool[], rosterPositions: string[], shape: DealShape, wantPos: string | null = null, limit = 9): FinderIdea[] {
+  const mineIds = new Set(mine.map((p) => p.id));
+  const myPool = mine.filter(isFlexPos).sort((a, b) => b.power - a.power).slice(0, 12);
+  const giveCombos = combos(myPool, shape.give);
+  const sum = (ps: PlayerValue[]) => ps.reduce((s, p) => s + p.power, 0);
+  const best = (ps: PlayerValue[]) => Math.max(...ps.map((p) => p.power));
+  const ideas: (FinderIdea & { score: number })[] = [];
+
+  for (const pool of pools) {
+    const market = pool.rosterId === null;
+    const all = pool.roster.filter((p) => !mineIds.has(p.id) && isFlexPos(p) && (!wantPos || p.position === wantPos)).sort((a, b) => b.power - a.power);
+    const perPartner: (FinderIdea & { score: number })[] = [];
+    for (const give of giveCombos) {
+      const giveSum = sum(give);
+      const giveBest = best(give);
+      // Only players in the right value range for this package: a consolidation brings back
+      // someone better than anyone you send; a split brings back players worth about a share each.
+      const each = giveSum / shape.get;
+      const local = all
+        .filter((p) => (shape.get === 1 ? p.power > giveBest && p.power <= giveSum * 1.35 : p.power < giveBest && p.power >= each * 0.35 && p.power <= each * 1.8))
+        .slice(0, market ? (shape.get === 1 ? 30 : shape.get === 2 ? 24 : 16) : 16);
+      for (const get of combos(local, shape.get)) {
+        const getSum = sum(get);
+        if (getSum < giveSum * 0.75 || getSum > giveSum * 1.35) continue; // nowhere near fair
+        const t = evaluateTrade(give, get);
+        if (t.balance < -MAX_SHOP_DISCOUNT || t.balance > MAX_EDGE) continue;
+        const r = rosterCheck(give, get, mine, rosterPositions, pool, true);
+        if (!r) continue;
+        const risk = tradeRiskReward(give, get)?.riskChange ?? 0;
+        const score = Math.min(t.balance, EDGE_CREDIT_CAP) * 60 + r.lineupGain + 0.4 * (r.theirGain ?? 0) - risk * RISK_PENALTY;
+        perPartner.push({
+          give: give.map((p) => p.id),
+          get: get.map((p) => p.id),
+          partner: market ? null : { rosterId: pool.rosterId, teamName: pool.teamName },
+          lineupGain: r.lineupGain,
+          theirGain: r.theirGain,
+          balance: t.balance,
+          rosterChange: get.length - give.length,
+          theirConcern: null,
+          score,
+        });
+      }
+    }
+    perPartner.sort((a, b) => b.score - a.score);
+    ideas.push(...perPartner.slice(0, market ? limit * 4 : 3));
+  }
+
+  // Best first; don't repeat a deal or lean on the same player more than twice on either side.
+  ideas.sort((a, b) => b.score - a.score);
+  const uses = new Map<string, number>();
+  const seen = new Set<string>();
+  const out: FinderIdea[] = [];
+  for (const { score: _score, ...i } of ideas) {
+    void _score;
+    const key = `${i.give.join()}>${i.get.join()}`;
+    const all = [...i.give, ...i.get];
+    if (seen.has(key) || all.some((id) => (uses.get(id) ?? 0) >= 2)) continue;
+    seen.add(key);
+    for (const id of all) uses.set(id, (uses.get(id) ?? 0) + 1);
+    out.push(i);
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 /**

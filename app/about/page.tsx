@@ -53,8 +53,9 @@ export default function AboutPage() {
 
         <h2>Judging a trade</h2>
         <p>
-          Trades are weighed on <b>trade weight</b>: each player&apos;s share of the top player&apos;s market price. Extra players on one side count for a little less
-          (roster spots are limited), so getting the best player in a deal is worth a premium. A trade is <b>fair</b> when the two sides are within{" "}
+          Trades are weighed on <b>trade weight</b>: each player&apos;s share of the top player&apos;s market price. Market prices already carry the star premium, so
+          each side is simply added up, plus a small credit (a waiver pickup&apos;s worth) for every roster spot the side getting fewer players saves. That&apos;s
+          the same approach FantasyCalc uses. A trade is <b>fair</b> when the two sides are within{" "}
           {Math.round(FAIR_PERCENT * 100)}%. Every trade also gets a letter grade, a risk-vs-reward rating (injuries, age, boom-or-bust weeks) and, with your team
           imported, the change to your starting lineup.
         </p>

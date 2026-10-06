@@ -3,16 +3,24 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import clsx from "clsx";
-import { ArrowDown, ArrowDownToLine, ArrowUpFromLine, Check, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowDownToLine, ArrowUpFromLine, Boxes, Check, Plus, Search, X } from "lucide-react";
 import { PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { TradeIdeaCard } from "@/components/TradeIdeaCard";
 import type { SavedTeam } from "@/lib/myTeam";
 import { analyzeTeam } from "@/lib/teamAnalysis";
-import { findOffers, shopPlayers, type FinderIdea, type FinderPool } from "@/lib/tradeFinder";
+import { findOffers, packageDeals, shopPlayers, type DealShape, type FinderIdea, type FinderPool } from "@/lib/tradeFinder";
 import { POSITIONS, type PlayerValue } from "@/lib/types";
 
-export type FinderMode = "away" | "for";
+export type FinderMode = "away" | "for" | "package";
+
+/** Deal types for "Package deals". */
+const SHAPES: { shape: DealShape; label: string; hint: string }[] = [
+  { shape: { give: 2, get: 1 }, label: "2 for 1", hint: "Package two of your players for one better one" },
+  { shape: { give: 3, get: 1 }, label: "3 for 1", hint: "Turn three players into one difference-maker" },
+  { shape: { give: 1, get: 2 }, label: "1 for 2", hint: "Split one of your players into two starters" },
+  { shape: { give: 1, get: 3 }, label: "1 for 3", hint: "Split one player into three for depth" },
+];
 
 const MAX_AWAY = 3;
 const MAX_WANT = 2;
@@ -40,19 +48,30 @@ export function TradeFinder({ team, players, initialAway = [], initialWant = [] 
   const [mode, setMode] = useState<FinderMode>(initialWant.length && !initialAway.length ? "for" : "away");
   const [away, setAway] = useState(() => initialAway.filter((id) => team.playerIds.includes(id)).slice(0, MAX_AWAY));
   const [want, setWant] = useState(() => initialWant.filter((id) => !team.playerIds.includes(id)).slice(0, MAX_WANT));
+  const [getCount, setGetCount] = useState<number | null>(null);
+  const [giveCount, setGiveCount] = useState<number | null>(null);
+  const [shapeIdx, setShapeIdx] = useState(0);
+  const [wantPos, setWantPos] = useState<string | null>(null);
   const dAway = useDeferredValue(away);
   const dWant = useDeferredValue(want);
   const rp = team.rosterPositions;
 
-  const awayIdeas = useMemo(() => shopPlayers(dAway.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p), mine, pools, rp), [dAway, board, mine, pools, rp]);
+  const awayIdeas = useMemo(
+    () => shopPlayers(dAway.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p), mine, pools, rp, 9, getCount),
+    [dAway, board, mine, pools, rp, getCount],
+  );
   const forIdeas = useMemo(() => {
     const targets = dWant.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p);
-    return findOffers(targets, mine, rp, targets[0] ? (ownerOf.get(targets[0].id) ?? null) : null);
-  }, [dWant, board, mine, rp, ownerOf]);
+    return findOffers(targets, mine, rp, targets[0] ? (ownerOf.get(targets[0].id) ?? null) : null, 6, giveCount);
+  }, [dWant, board, mine, rp, ownerOf, giveCount]);
+  const packageIdeas = useMemo(
+    () => (mode === "package" ? packageDeals(mine, pools, rp, SHAPES[shapeIdx].shape, wantPos) : []),
+    [mode, mine, pools, rp, shapeIdx, wantPos],
+  );
 
-  const selected = mode === "away" ? away : want;
-  const ideas = mode === "away" ? awayIdeas : forIdeas;
-  const names = selected.map((id) => board.get(id)?.name).filter(Boolean).join(" + ");
+  const selected = mode === "away" ? away : mode === "for" ? want : ["package"];
+  const ideas = mode === "away" ? awayIdeas : mode === "for" ? forIdeas : packageIdeas;
+  const names = mode === "package" ? `${SHAPES[shapeIdx].label}${wantPos ? ` for a ${wantPos}` : ""}` : selected.map((id) => board.get(id)?.name).filter(Boolean).join(" + ");
   const scrollToResults = () => document.getElementById("finder-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
@@ -62,9 +81,17 @@ export function TradeFinder({ team, players, initialAway = [], initialWant = [] 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
         <aside className="card p-4 lg:sticky lg:top-6">
           {mode === "away" ? (
-            <AwayPicker mine={mine} selected={away} onChange={setAway} />
+            <>
+              <CountChips label="How many players back?" value={getCount} onChange={setGetCount} />
+              <AwayPicker mine={mine} selected={away} onChange={setAway} />
+            </>
+          ) : mode === "for" ? (
+            <>
+              <CountChips label="How many of yours to offer?" value={giveCount} onChange={setGiveCount} />
+              <ForPicker team={team} players={players} mine={mine} pool={searchPool} ownerOf={ownerOf} board={board} selected={want} onChange={setWant} />
+            </>
           ) : (
-            <ForPicker team={team} players={players} mine={mine} pool={searchPool} ownerOf={ownerOf} board={board} selected={want} onChange={setWant} />
+            <PackagePicker shapeIdx={shapeIdx} onShape={setShapeIdx} wantPos={wantPos} onWantPos={setWantPos} />
           )}
           {selected.length > 0 && (
             <button
@@ -96,20 +123,22 @@ export function TradeFinder({ team, players, initialAway = [], initialWant = [] 
                   {ideas.length} fair trade{ideas.length === 1 ? "" : "s"}
                 </h2>
                 <p className="min-w-0 truncate text-sm text-muted">
-                  {mode === "away" ? "for " : "to get "}
+                  {mode === "away" ? "for " : mode === "for" ? "to get " : ""}
                   <b className="text-ink">{names}</b>
                 </p>
               </div>
               {ideas.length === 0 ? (
                 <p className="card px-5 py-6 text-sm text-muted">
                   {mode === "away"
-                    ? "No fair deals for that combo that keep both lineups full. Try adding or removing a player."
-                    : "Nothing on your roster makes a fair offer without leaving a hole in your lineup. Try a cheaper target."}
+                    ? "No fair deals for that combo that keep both lineups full. Try adding or removing a player, or a different number back."
+                    : mode === "for"
+                      ? "Nothing on your roster makes a fair offer without leaving a hole in your lineup. Try a cheaper target or a different number of players."
+                      : "No fair deals of this type keep both lineups full right now. Try another deal type or position."}
                 </p>
               ) : (
                 <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2">
                   {ideas.map((i, n) => (
-                    <IdeaCard key={`${i.give.join()}-${i.get.join()}`} idea={i} index={n} board={board} fallbackTitle={mode === "away" ? "Trade idea" : "Offer"} />
+                    <IdeaCard key={`${i.give.join()}-${i.get.join()}`} idea={i} index={n} board={board} fallbackTitle={mode === "for" ? "Offer" : "Trade idea"} />
                   ))}
                 </div>
               )}
@@ -125,22 +154,79 @@ function ModeSwitch({ mode, onChange }: { mode: FinderMode; onChange: (m: Finder
   const tabs = [
     { id: "away", label: "Trade away", hint: "See what your players can get", icon: ArrowUpFromLine, color: "text-rocket" },
     { id: "for", label: "Trade for", hint: "See what it takes to get someone", icon: ArrowDownToLine, color: "text-volt" },
+    { id: "package", label: "Package deals", hint: "Best 2-for-1s, 1-for-2s and more", icon: Boxes, color: "text-flame" },
   ] as const;
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-surface p-1">
+    <div className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-surface p-1">
       {tabs.map((t) => {
         const on = mode === t.id;
         return (
           <button key={t.id} onClick={() => onChange(t.id)} className={clsx("relative rounded-xl px-3 py-3 text-left transition sm:px-4", on ? "text-ink" : "text-muted hover:text-ink")}>
             {on && <motion.span layoutId="finder-mode" className="absolute inset-0 rounded-xl border border-line-strong bg-surface-3" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
-            <span className="relative flex items-center gap-2 font-display text-lg font-bold uppercase tracking-wide sm:text-xl">
-              <t.icon className={clsx("size-5", on && t.color)} /> {t.label}
+            <span className="relative flex items-center gap-2 font-display text-[15px] font-bold uppercase leading-tight tracking-wide sm:text-xl">
+              <t.icon className={clsx("hidden size-5 shrink-0 sm:block", on && t.color)} /> {t.label}
             </span>
             <span className="relative mt-0.5 hidden text-xs text-muted sm:block">{t.hint}</span>
           </button>
         );
       })}
     </div>
+  );
+}
+
+/** "Any / 1 / 2 / 3" chooser for how many players come back (or go out) in a deal. */
+function CountChips({ label, value, onChange }: { label: string; value: number | null; onChange: (n: number | null) => void }) {
+  return (
+    <div className="mb-4">
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-faint">{label}</p>
+      <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface-2 p-1">
+        {[null, 1, 2, 3].map((n) => (
+          <button
+            key={n ?? "any"}
+            onClick={() => onChange(n)}
+            className={clsx("rounded-lg py-1.5 text-xs font-bold transition", value === n ? "bg-surface-3 text-ink ring-1 ring-line-strong" : "text-muted hover:text-ink")}
+          >
+            {n ?? "Any"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PackagePicker({ shapeIdx, onShape, wantPos, onWantPos }: { shapeIdx: number; onShape: (i: number) => void; wantPos: string | null; onWantPos: (p: string | null) => void }) {
+  return (
+    <>
+      <PickerTitle title="Deal type" hint="We search every combination on your roster for fair deals of this type that keep your lineup full." />
+      <ul className="space-y-1.5">
+        {SHAPES.map((s, i) => (
+          <li key={s.label}>
+            <button
+              onClick={() => onShape(i)}
+              className={clsx(
+                "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition",
+                shapeIdx === i ? "border-rocket/60 bg-rocket/10" : "border-line hover:bg-white/[0.04]",
+              )}
+            >
+              <span className="w-14 shrink-0 font-display text-xl font-bold uppercase">{s.label}</span>
+              <span className="text-xs text-muted">{s.hint}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mb-1.5 mt-4 text-[10px] font-bold uppercase tracking-[0.15em] text-faint">Position you want back</p>
+      <div className="grid grid-cols-5 gap-1 rounded-xl bg-surface-2 p-1">
+        {[null, "QB", "RB", "WR", "TE"].map((p) => (
+          <button
+            key={p ?? "any"}
+            onClick={() => onWantPos(p)}
+            className={clsx("rounded-lg py-1.5 text-xs font-bold transition", wantPos === p ? "bg-surface-3 text-ink ring-1 ring-line-strong" : "text-muted hover:text-ink")}
+          >
+            {p ?? "Any"}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 

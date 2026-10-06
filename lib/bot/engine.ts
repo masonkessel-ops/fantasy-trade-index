@@ -229,7 +229,7 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
     else if (r.verdict === "win") text = `**You win this one by ${pct}%** (${w}). The other team will probably say no as it stands.`;
     else text = `**You'd be overpaying by ${pct}%** (${w}).`;
     if (r.verdict === "win" && get.length === 1 && give.length >= 2) text += ` Stars cost a premium: ${give.length} mid-level players don't add up to ${get[0].name}.`;
-    if (r.verdict === "lose" && give.length === 1 && get.length >= 2) text += ` You're giving the best player in the deal, which is worth more than the sum of the parts.`;
+    if (r.verdict === "lose" && give.length === 1 && get.length >= 2) text += ` The ${get.length} players you'd get add up to less than ${give[0].name}.`;
     if (rr) text += `\n\nRisk vs reward: **${rr.rating}** (${rr.summary}).`;
 
     if (team && give.every((p) => mineIds.has(p.id))) {

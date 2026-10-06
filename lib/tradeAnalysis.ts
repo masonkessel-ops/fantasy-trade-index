@@ -3,26 +3,24 @@
  *
  * Trades are judged on each player's trade weight ("power"): his share of the
  * best player's worth, blended with real trade-market values (lib/market.ts).
- * That scale is linear like the market's, so stars cost what people actually
- * pay: Gibbs (100) takes roughly two top-25 players plus a top-50 player.
- * Each extra player on a side also counts for a little less
- * (CONSOLIDATION_WEIGHTS), because roster spots and starting slots are limited.
+ * That scale is linear like the market's prices, which already carry the star
+ * premium (Gibbs at 100 is worth about two players at 54 each), so sides are
+ * simply added up. The only adjustment is FantasyCalc's: the side that receives
+ * fewer players frees roster spots, worth a waiver pickup each (ROSTER_SPOT_VALUE).
  */
 import type { PlayerValue } from "./types";
 
-/** Weight of the 1st, 2nd, 3rd… most valuable player on each side of a trade. */
-export const CONSOLIDATION_WEIGHTS = [1, 0.85, 0.7, 0.6, 0.5];
+/**
+ * What one open roster spot is worth in trade weight: about a waiver-wire pickup
+ * (players ranked ~150–180 are worth 2–4). The side receiving fewer players gets
+ * this for every spot it saves.
+ */
+export const ROSTER_SPOT_VALUE = 3;
 
 /** A trade is "fair" when sides are within this share of the bigger side's power… */
 export const FAIR_PERCENT = 0.12;
 /** …or within this many power points (keeps low-value swaps from flip-flopping). */
 export const FAIR_ABSOLUTE = 2;
-
-export function adjustedPower(powers: number[]) {
-  return [...powers]
-    .sort((a, b) => b - a)
-    .reduce((sum, v, i) => sum + v * (CONSOLIDATION_WEIGHTS[i] ?? CONSOLIDATION_WEIGHTS.at(-1)!), 0);
-}
 
 export type Verdict = "fair" | "win" | "lose" | "empty";
 
@@ -30,7 +28,7 @@ export interface TradeResult {
   /** sum of displayed values on each side (what users see) */
   rawGive: number;
   rawGet: number;
-  /** consolidation-adjusted trade power on each side (what the verdict uses) */
+  /** trade weight on each side, including the roster-spot credit (what the verdict uses) */
   adjGive: number;
   adjGet: number;
   /** adjGet - adjGive in power points: positive = you win */
@@ -43,8 +41,10 @@ export interface TradeResult {
 export function evaluateTrade(give: PlayerValue[], get: PlayerValue[]): TradeResult {
   const rawGive = give.reduce((s, p) => s + p.value, 0);
   const rawGet = get.reduce((s, p) => s + p.value, 0);
-  const adjGive = Math.round(adjustedPower(give.map((p) => p.power)) * 10) / 10;
-  const adjGet = Math.round(adjustedPower(get.map((p) => p.power)) * 10) / 10;
+  const sum = (ps: PlayerValue[]) => ps.reduce((s, p) => s + p.power, 0);
+  // Getting fewer players than you send frees roster spots for waiver pickups (and vice versa).
+  const adjGive = Math.round((sum(give) + Math.max(0, get.length - give.length) * ROSTER_SPOT_VALUE) * 10) / 10;
+  const adjGet = Math.round((sum(get) + Math.max(0, give.length - get.length) * ROSTER_SPOT_VALUE) * 10) / 10;
   const diff = Math.round((adjGet - adjGive) * 10) / 10;
   const bigger = Math.max(adjGive, adjGet, 0.1);
   const balance = Math.max(-1, Math.min(1, diff / bigger));
