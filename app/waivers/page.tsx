@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { PageHeader } from "@/components/PageHeader";
 import { getScoring } from "@/lib/prefs";
 import { getWaiverTrends } from "@/lib/weekly";
@@ -24,6 +25,7 @@ export default async function WaiversPage() {
         subtitle="Who fantasy managers are adding and dropping right now across Sleeper leagues, with each player's value and this week's projection."
       />
       <WaiverWire adds={adds} drops={drops} week={week} />
+      <NewsletterSignup source="waivers" className="mt-6" />
     </>
   );
 }

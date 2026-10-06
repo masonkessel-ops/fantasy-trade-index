@@ -12,6 +12,7 @@ import {
   ListOrdered,
   Menu,
   MessagesSquare,
+  Newspaper,
   Radio,
   Repeat,
   TrendingUp,
@@ -57,6 +58,7 @@ const GROUPS: { title: string | null; items: NavItem[] }[] = [
       { href: "/waivers", label: "Waiver Wire", short: "Waivers", icon: TrendingUp },
       { href: "/live", label: "Live Tracker", short: "Live", icon: Radio },
       { href: "/team-of-the-week", label: "Team of the Week", short: "TOTW", icon: Trophy },
+      { href: "/newsletter", label: "Weekly Report", short: "Report", icon: Newspaper },
     ],
   },
 ];

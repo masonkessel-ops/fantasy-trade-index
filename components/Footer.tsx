@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { LogoMark } from "./Logo";
+import { NewsletterSignup } from "./NewsletterSignup";
 
 export function Footer() {
   return (
     <footer className="mt-16 border-t border-line pt-8 pb-4 text-xs text-faint">
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-sm">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
             <LogoMark className="size-6" /> Fantasy Trade Index
@@ -20,6 +21,12 @@ export function Footer() {
             </a>
             .
           </p>
+        </div>
+        <div className="w-full max-w-sm">
+          <p className="mb-2 text-sm font-semibold text-ink">
+            The Weekly Trade Report <span className="font-normal text-faint">· free, every week</span>
+          </p>
+          <NewsletterSignup source="footer" compact />
         </div>
         <nav className="grid grid-cols-2 gap-x-10 gap-y-2 sm:grid-cols-3">
           <Link href="/about" className="hover:text-muted">
@@ -39,6 +46,9 @@ export function Footer() {
           </Link>
           <Link href="/about#faq" className="hover:text-muted">
             FAQ
+          </Link>
+          <Link href="/newsletter" className="hover:text-muted">
+            Weekly report
           </Link>
         </nav>
       </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeftRight, ArrowRight, Flame, ListOrdered, MessagesSquare, Radio, Repeat, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { ChangePill, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { Sparkline } from "@/components/Charts";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { getLiveWeek } from "@/lib/live";
 import { getScoring } from "@/lib/prefs";
 import { getValueBoard } from "@/lib/values";
@@ -197,6 +198,8 @@ export default async function Home() {
         <MoverCard title="Risers" icon={<TrendingUp className="size-5 text-up" />} players={risers} delay={180} />
         <MoverCard title="Fallers" icon={<TrendingDown className="size-5 text-down" />} players={fallers} delay={220} />
       </div>
+
+      <NewsletterSignup source="home" />
 
     </div>
   );

@@ -10,7 +10,8 @@ const token = () => (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_
 
 export const storeConfigured = () => !!(url() && token());
 
-async function command<T>(cmd: string[]): Promise<T> {
+/** Run one Redis command (e.g. ["SADD", "key", "value"]). */
+export async function command<T>(cmd: string[]): Promise<T> {
   const res = await fetch(url(), {
     method: "POST",
     headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
