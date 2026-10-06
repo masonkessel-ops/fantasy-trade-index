@@ -26,6 +26,7 @@ import { LogoMark, Wordmark } from "./Logo";
 import { ScoringToggle } from "./ScoringToggle";
 import { YahooAccount } from "./YahooAccount";
 import { AccountButton } from "./AccountButton";
+import { PremiumNavLink } from "./PremiumNavLink";
 import type { Scoring } from "@/lib/types";
 
 const YAHOO_SIGN_IN = process.env.NEXT_PUBLIC_YAHOO_SIGN_IN === "1";
@@ -117,6 +118,7 @@ export function Nav({ scoring }: { scoring: Scoring }) {
           ))}
         </nav>
         <div className="mt-auto space-y-4 px-2">
+          <PremiumNavLink />
           <AccountButton />
           {YAHOO_SIGN_IN && <YahooAccount />}
           <div>
@@ -195,6 +197,7 @@ export function Nav({ scoring }: { scoring: Scoring }) {
                 </button>
               </div>
               <div className="mb-3 space-y-2">
+                <PremiumNavLink onClick={() => setOpen(false)} />
                 <AccountButton />
                 {YAHOO_SIGN_IN && <YahooAccount />}
               </div>

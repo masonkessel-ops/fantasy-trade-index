@@ -37,10 +37,19 @@ export default function PrivacyPage() {
           </li>
         </ul>
 
+        <h2>Premium payments</h2>
+        <p>
+          If you buy Premium, Stripe handles the payment; we never see or store your card. We keep your plan, when it ends, and the Stripe customer ID linked to
+          your Google account, so Premium follows you to any device.
+        </p>
+
+        <h2>Newsletter</h2>
+        <p>If you sign up for the Weekly Trade Report, we keep your email address to send it (through our newsletter provider, beehiiv). Every email has an unsubscribe link.</p>
+
         <h2>Services we use</h2>
         <p>
           Vercel hosts the site (standard server logs such as IP address and pages requested). Player data comes from Sleeper and market values from FantasyCalc; your
-          personal data isn&apos;t sent to either. The screenshot reader downloads from the jsDelivr CDN. Google provides sign-in, and Upstash stores saved teams.
+          personal data isn&apos;t sent to either. The screenshot reader downloads from the jsDelivr CDN. Google provides sign-in, Upstash stores saved teams, Stripe processes payments, and beehiiv sends the newsletter.
         </p>
 
         <h2>Children</h2>

@@ -14,9 +14,13 @@ export interface Account {
   user: { name: string; email: string; picture: string | null } | null;
   syncing: boolean;
   lastSyncError: string | null;
+  /** Premium is set up on this site (Stripe keys present) */
+  premiumAvailable: boolean;
+  /** this account's active membership */
+  premium: { plan: "monthly" | "season"; until: number; cancelsAtPeriodEnd: boolean; canManage: boolean } | null;
 }
 
-let state: Account = { loaded: false, configured: false, user: null, syncing: false, lastSyncError: null };
+let state: Account = { loaded: false, configured: false, user: null, syncing: false, lastSyncError: null, premiumAvailable: false, premium: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<Account>) => {
   state = { ...state, ...patch };
@@ -49,8 +53,8 @@ function start() {
   });
   fetch("/api/me")
     .then((r) => r.json())
-    .then((d: { configured: boolean; user: Account["user"]; team: SavedTeam | null }) => {
-      set({ loaded: true, configured: d.configured, user: d.user });
+    .then((d: { configured: boolean; user: Account["user"]; team: SavedTeam | null; premiumAvailable?: boolean; premium?: Account["premium"] }) => {
+      set({ loaded: true, configured: d.configured, user: d.user, premiumAvailable: !!d.premiumAvailable, premium: d.premium ?? null });
       if (!d.user) return;
       const local = readSavedTeam();
       const cloud = d.team;
@@ -74,5 +78,14 @@ export function useAccount(): Account {
 
 export async function signOut() {
   await fetch("/api/auth/logout", { method: "POST" });
-  set({ user: null });
+  set({ user: null, premium: null });
+}
+
+/**
+ * Should Premium-only extras be locked for this visitor? Only when Premium is actually
+ * for sale on this site and they don't have it (before Stripe is set up, everything is free).
+ */
+export function usePremiumLock() {
+  const a = useAccount();
+  return { locked: a.loaded && a.premiumAvailable && !a.premium, loaded: a.loaded, account: a };
 }

@@ -25,6 +25,14 @@ export default function TermsPage() {
         <h2>Fair use of the site</h2>
         <p>Please don&apos;t overload the site with automated requests, try to break it, or use it for anything illegal. We may limit or block abusive traffic.</p>
 
+        <h2>Premium and payments</h2>
+        <p>
+          Premium is optional. Payments are processed by Stripe. The <b>Monthly</b> plan renews automatically each month until you cancel; cancel anytime under Manage
+          billing on the Premium page, and you keep Premium until the end of the period you paid for. The <b>Season pass</b> is a one-time payment that lasts through
+          February 15 and doesn&apos;t renew. If something goes wrong with a charge, contact us within 14 days and we&apos;ll make it right, including a refund
+          where appropriate. Prices can change, but never for a period you&apos;ve already paid for.
+        </p>
+
         <h2>No warranty</h2>
         <p>The site is provided as is, without warranties of any kind, and may be changed or taken offline at any time.</p>
 

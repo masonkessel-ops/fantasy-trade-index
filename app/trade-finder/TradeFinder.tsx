@@ -6,7 +6,9 @@ import clsx from "clsx";
 import { ArrowDown, ArrowDownToLine, ArrowUpFromLine, Boxes, Check, Plus, Search, X } from "lucide-react";
 import { PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { PlayerSearch } from "@/components/PlayerSearch";
+import { PremiumLock } from "@/components/PremiumLock";
 import { TradeIdeaCard } from "@/components/TradeIdeaCard";
+import { usePremiumLock } from "@/lib/account";
 import type { SavedTeam } from "@/lib/myTeam";
 import { analyzeTeam } from "@/lib/teamAnalysis";
 import { findOffers, packageDeals, shopPlayers, type DealShape, type FinderIdea, type FinderPool } from "@/lib/tradeFinder";
@@ -71,6 +73,11 @@ export function TradeFinder({ team, players, initialAway = [], initialWant = [] 
 
   const selected = mode === "away" ? away : mode === "for" ? want : ["package"];
   const ideas = mode === "away" ? awayIdeas : mode === "for" ? forIdeas : packageIdeas;
+  // Free: the top 3 ideas (top 1 for Package deals). Premium: all of them.
+  const { locked } = usePremiumLock();
+  const freeCount = mode === "package" ? 1 : 3;
+  const shown = locked ? ideas.slice(0, freeCount) : ideas;
+  const hidden = ideas.length - shown.length;
   const names = mode === "package" ? `${SHAPES[shapeIdx].label}${wantPos ? ` for a ${wantPos}` : ""}` : selected.map((id) => board.get(id)?.name).filter(Boolean).join(" + ");
   const scrollToResults = () => document.getElementById("finder-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -137,9 +144,10 @@ export function TradeFinder({ team, players, initialAway = [], initialWant = [] 
                 </p>
               ) : (
                 <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2">
-                  {ideas.map((i, n) => (
+                  {shown.map((i, n) => (
                     <IdeaCard key={`${i.give.join()}-${i.get.join()}`} idea={i} index={n} board={board} fallbackTitle={mode === "for" ? "Offer" : "Trade idea"} />
                   ))}
+                  {hidden > 0 && <PremiumLock hidden={hidden} what={mode === "package" ? "package deals" : "trade ideas"} />}
                 </div>
               )}
             </>
