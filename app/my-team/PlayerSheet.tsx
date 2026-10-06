@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import clsx from "clsx";
-import { ArrowUpFromLine, ExternalLink, X } from "lucide-react";
+import { ArrowUpFromLine, ExternalLink, Trash2, X } from "lucide-react";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { RiskTag } from "@/components/RiskReward";
 import { playerRisk } from "@/lib/risk";
@@ -24,12 +24,15 @@ export function PlayerSheet({
   weekNumber,
   onClose,
   onTradeAway,
+  onRemove,
 }: {
   player: PlayerValue | null;
   week?: PlayerWeek;
   weekNumber: number | null;
   onClose: () => void;
   onTradeAway: (id: string) => void;
+  /** only for hand-built teams */
+  onRemove?: (id: string) => void;
 }) {
   return (
     <AnimatePresence>
@@ -45,7 +48,7 @@ export function PlayerSheet({
             exit={{ y: 40, opacity: 0 }}
             transition={{ type: "spring", stiffness: 420, damping: 36 }}
           >
-            <Body player={player} week={week} weekNumber={weekNumber} onClose={onClose} onTradeAway={onTradeAway} />
+            <Body player={player} week={week} weekNumber={weekNumber} onClose={onClose} onTradeAway={onTradeAway} onRemove={onRemove} />
           </motion.div>
         </>
       )}
@@ -59,12 +62,14 @@ function Body({
   weekNumber,
   onClose,
   onTradeAway,
+  onRemove,
 }: {
   player: PlayerValue;
   week?: PlayerWeek;
   weekNumber: number | null;
   onClose: () => void;
   onTradeAway: (id: string) => void;
+  onRemove?: (id: string) => void;
 }) {
   const risk = playerRisk(p);
   const color = POS_COLOR[p.position];
@@ -166,6 +171,14 @@ function Body({
           Full stats <ExternalLink className="size-4" />
         </Link>
       </div>
+      {onRemove && (
+        <button
+          onClick={() => onRemove(p.id)}
+          className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-muted transition hover:bg-down/10 hover:text-down"
+        >
+          <Trash2 className="size-4" /> Remove from my team
+        </button>
+      )}
     </>
   );
 }

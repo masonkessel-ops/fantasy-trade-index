@@ -138,17 +138,21 @@ function findTrades(
       }
     }
     best.sort((a, b) => b.score - a.score);
-    ideas.push(...best.slice(0, marketMode ? 8 : 2));
+    ideas.push(...best.slice(0, marketMode ? 60 : 2));
   }
 
-  // Global top picks, without repeating the same target twice.
+  // Global top picks: no repeated target, the same package offered once, and no player offered more than twice.
   ideas.sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
+  const offered = new Map<string, number>();
   const out: TradeIdea[] = [];
   for (const idea of ideas) {
     const key = idea.get.join(",");
-    if (seen.has(key)) continue;
+    const giveKey = `give:${idea.give.join(",")}`;
+    if (seen.has(key) || seen.has(giveKey) || idea.give.some((id) => (offered.get(id) ?? 0) >= 2)) continue;
     seen.add(key);
+    seen.add(giveKey);
+    for (const id of idea.give) offered.set(id, (offered.get(id) ?? 0) + 1);
     out.push({ partner: idea.partner, give: idea.give, get: idea.get, myGain: idea.myGain, theirGain: idea.theirGain, diff: idea.diff });
     if (out.length >= 6) break;
   }

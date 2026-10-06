@@ -2,13 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
-import clsx from "clsx";
-import { ArrowDownUp, Bot, Lock, Loader2, Repeat2, Sparkles, UserPlus } from "lucide-react";
+import { ArrowRight, Bot, Loader2, Repeat2, Sparkles, UserPlus } from "lucide-react";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { TradeIdeaCard } from "@/components/TradeIdeaCard";
 import type { SavedTeam } from "@/lib/myTeam";
-import { SLOT_LABEL } from "@/lib/teamAnalysis";
 import type { PlayerValue, Scoring } from "@/lib/types";
 
 /** Mirrors lib/advice.ts (kept separate so this client file doesn't import server code). */
@@ -70,92 +67,89 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
     );
   }
 
-  const name = (id: string) => board.get(id)?.name ?? "Unknown";
-  const pts = (id: string) => advice.weekPoints[id];
+
+  const trades = advice.trades.slice(0, 3);
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-rocket">Week {advice.week}</p>
-          <h2 className="font-display text-3xl font-extrabold uppercase italic leading-none">Your game plan</h2>
+    <section className="space-y-5">
+      {/* Trade ideas */}
+      <div className="card p-5">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 font-display text-xl font-bold uppercase tracking-wide">
+              <Repeat2 className="size-5 text-flame" /> Trades you should make
+            </h2>
+            <p className="text-xs text-muted">
+              {advice.hasLeague
+                ? "Fair trades with teams in your league that upgrade your lineup without gutting theirs."
+                : "Fair trades that upgrade your starting lineup. Import your league to target real rosters."}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Link
+              href="/assistant"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:text-ink"
+            >
+              <Bot className="size-3.5" /> Ask the AI
+            </Link>
+            <Link
+              href="/trade-finder"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-gradient-to-r from-rocket to-flame px-4 text-xs font-bold text-bg transition hover:brightness-110"
+            >
+              Trade Finder <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
         </div>
-        <Link
-          href="/assistant"
-          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-ink"
-        >
-          <Bot className="size-3.5" /> Ask the AI
-        </Link>
+        {trades.length === 0 ? (
+          <p className="rounded-xl bg-white/[0.04] px-4 py-3 text-sm text-muted">No clear upgrades right now. Your roster is well balanced for its value.</p>
+        ) : (
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {trades.map((t, i) => (
+              <TradeIdeaCard
+                key={i}
+                index={i}
+                title={t.partner.teamName}
+                subtitle={t.theirGain !== null ? (t.theirGain >= 0 ? "Helps both lineups" : "They may need convincing") : null}
+                give={t.give}
+                get={t.get}
+                board={board}
+                partnerRosterId={t.partner.rosterId}
+                note={
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="size-3.5 text-up" />
+                    <span>
+                      <b className="text-up">+{t.myGain}</b> to your lineup
+                      {t.theirGain !== null && (
+                        <>
+                          {" · "}
+                          <span className={t.theirGain >= 0 ? "text-up" : "text-flame"}>
+                            {t.theirGain >= 0 ? "+" : ""}
+                            {t.theirGain}
+                          </span>{" "}
+                          to theirs
+                        </>
+                      )}
+                    </span>
+                  </span>
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
-        {/* Start / sit */}
+      {/* Pickups (needs a league so we know who's a free agent) */}
+      {advice.hasLeague && (
         <div className="card p-5">
-          <h3 className="mb-1 flex items-center gap-2 font-display text-xl font-bold uppercase tracking-wide">
-            <ArrowDownUp className="size-5 text-volt" /> Start / sit
-          </h3>
-          <p className="mb-3 text-xs text-muted">Best lineup by week {advice.week} projections. Injuries and byes are accounted for.</p>
-          {advice.swaps.length > 0 ? (
-            <ul className="mb-4 space-y-2">
-              {advice.swaps.map((s) => (
-                <motion.li
-                  key={s.start}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="rounded-xl border border-up/25 bg-up/10 px-3 py-2.5 text-sm"
-                >
-                  <span className="font-semibold text-up">Start {name(s.start)}</span>{" "}
-                  <span className="text-muted">({s.startPoints} proj)</span> over{" "}
-                  <span className="font-semibold">{name(s.bench)}</span>{" "}
-                  <span className="text-muted">({pts(s.bench)?.bye ? "on bye" : `${s.benchPoints} proj`})</span>
-                  <span className="ml-1 font-display font-bold text-up">+{s.gain}</span>
-                </motion.li>
-              ))}
-            </ul>
-          ) : team.source !== "manual" ? (
-            <p className="mb-4 rounded-xl bg-white/[0.04] px-3 py-2.5 text-sm text-muted">✅ Your current lineup is already optimal.</p>
-          ) : null}
-          <ul className="space-y-1">
-            {advice.lineup.map((l, i) => {
-              const p = l.id ? board.get(l.id) : null;
-              return (
-                <li key={i} className="flex items-center gap-2.5 rounded-lg px-1 py-1.5">
-                  <span className="w-10 text-center text-[11px] font-bold text-faint">{SLOT_LABEL[l.slot] ?? l.slot}</span>
-                  {p ? (
-                    <>
-                      <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={28} />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {p.name} <InjuryTag status={p.injuryStatus} />
-                      </span>
-                      {l.locked && <Lock className="size-3 text-faint" aria-label="Game started" />}
-                      <span className={clsx("w-12 text-right font-display text-base font-bold tabular", l.bye && "text-down")}>
-                        {l.bye ? "BYE" : l.points}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="flex-1 text-sm text-faint">Empty: pick someone up</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        {/* Pickups */}
-        <div className="card p-5">
-          <h3 className="mb-1 flex items-center gap-2 font-display text-xl font-bold uppercase tracking-wide">
+          <h2 className="mb-1 flex items-center gap-2 font-display text-xl font-bold uppercase tracking-wide">
             <UserPlus className="size-5 text-up" /> Waiver pickups
-          </h3>
-          {!advice.hasLeague ? (
-            <p className="mt-2 text-sm text-muted">
-              Import your league to see free agents worth adding. We need to know who&apos;s already rostered.
-            </p>
-          ) : advice.pickups.length === 0 ? (
+          </h2>
+          {advice.pickups.length === 0 ? (
             <p className="mt-2 text-sm text-muted">No free agents beat what you have right now. Nice roster.</p>
           ) : (
             <>
-              <p className="mb-3 text-xs text-muted">Free agents in your league who&apos;d help.</p>
-              <ul className="space-y-2">
+              <p className="mb-3 text-xs text-muted">Free agents in your league who&apos;d help this week.</p>
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
                 {advice.pickups.map((pk) => {
                   const add = board.get(pk.add);
                   const drop = pk.drop ? board.get(pk.drop) : null;
@@ -163,7 +157,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
                   return (
                     <li key={pk.add} className="rounded-xl border border-line bg-surface-2 p-3">
                       <div className="flex items-center gap-2.5">
-                        <PlayerAvatar id={add.id} position={add.position} team={add.team} name={add.name} size={34} />
+                        <PlayerAvatar id={add.id} position={add.position} team={add.team} name={add.name} size={36} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-up">ADD</span>
@@ -180,11 +174,11 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
                         <ValueBadge value={add.value} size="sm" />
                       </div>
                       {drop && (
-                        <div className="mt-2 flex items-center gap-1.5 pl-11 text-xs text-muted">
+                        <div className="mt-2 flex items-center gap-1.5 pl-12 text-xs text-muted">
                           <span className="font-bold text-down">DROP</span> {drop.name} ({drop.value})
                         </div>
                       )}
-                      <p className="mt-1.5 pl-11 text-xs text-faint">{pk.reason}</p>
+                      <p className="mt-1.5 pl-12 text-xs text-faint">{pk.reason}</p>
                     </li>
                   );
                 })}
@@ -192,55 +186,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
             </>
           )}
         </div>
-      </div>
-
-      {/* Trade ideas */}
-      <div className="card p-5">
-        <h3 className="mb-1 flex items-center gap-2 font-display text-xl font-bold uppercase tracking-wide">
-          <Repeat2 className="size-5 text-flame" /> Trades you should make
-        </h3>
-        <p className="mb-4 text-xs text-muted">
-          {advice.hasLeague
-            ? "Fair trades with teams in your league that upgrade your starting lineup without gutting theirs."
-            : "Fair trades that upgrade your starting lineup. Import your league to target real rosters."}
-        </p>
-        {advice.trades.length === 0 ? (
-          <p className="text-sm text-muted">No clear upgrades found right now. Your roster is well balanced for its value.</p>
-        ) : (
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {advice.trades.map((t, i) => (
-              <TradeIdeaCard
-                key={i}
-                index={i}
-                title={t.partner.teamName}
-                subtitle={t.theirGain !== null ? (t.theirGain >= 0 ? "Helps both lineups" : "They may need convincing") : null}
-                give={t.give}
-                get={t.get}
-                board={board}
-                partnerRosterId={t.partner.rosterId}
-                note={
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="size-3.5 text-up" />
-                    <span>
-                      <b className="text-up">+{t.myGain}</b> starting-lineup value for you
-                      {t.theirGain !== null && (
-                        <>
-                          {" · "}
-                          <span className={t.theirGain >= 0 ? "text-up" : "text-flame"}>
-                            {t.theirGain >= 0 ? "+" : ""}
-                            {t.theirGain}
-                          </span>{" "}
-                          for them
-                        </>
-                      )}
-                    </span>
-                  </span>
-                }
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </section>
   );
 }
