@@ -112,7 +112,7 @@ export interface RosterTextResult {
 export async function matchRosterText(text: string): Promise<RosterTextResult> {
   const players = Object.values(await getPlayers());
   const cleaned = text
-    .replace(/\|/g, " ")
+    .replace(/[^\p{L}\p{N}\s.'’\-/+&]/gu, " ") // stray symbols from screenshots: "C.J). Stroud»" -> "C.J . Stroud"
     .replace(/\b([A-Z])\.(?=[A-Z][a-z])/g, "$1. "); // "J.Allen" -> "J. Allen"
   const lines = cleaned.split(/\n/).map((l) => ` ${normalizeName(l)} `);
   const whole = ` ${lines.join(" ")} `;
@@ -141,9 +141,11 @@ export async function matchRosterText(text: string): Promise<RosterTextResult> {
     const ctxWords = ctx.trim().split(" ");
     for (let i = 0; i < words.length - 1; i++) {
       if (words[i].length !== 1) continue;
-      const initial = words[i];
+      // Screenshots sometimes read the initial "J." as "1."
+      const initials = words[i] === "1" ? ["j", "i", "l"] : /[a-z]/.test(words[i]) ? [words[i]] : [];
+      if (!initials.length) continue;
       for (const last of [`${words[i + 1]} ${words[i + 2] ?? ""}`.trim(), words[i + 1]]) {
-        const cands = players.filter((p) => p.position !== "DST" && normalizeName(p.lastName) === last && normalizeName(p.firstName).startsWith(initial));
+        const cands = players.filter((p) => p.position !== "DST" && normalizeName(p.lastName) === last && initials.some((c) => normalizeName(p.firstName).startsWith(c)));
         if (!cands.length) continue;
         const ctxPos = new Set(ctxWords.slice(i + 1).map((w) => POS_TOKENS[w]).filter(Boolean));
         const fits = cands.filter((p) => (!p.team || ctx.includes(` ${p.team.toLowerCase()} `)) && (!ctxPos.size || ctxPos.has(p.position)));

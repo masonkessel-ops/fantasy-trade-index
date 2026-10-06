@@ -9,6 +9,7 @@ import { PlayerSearch } from "@/components/PlayerSearch";
 import { PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { ScoringToggle, setScoringCookie } from "@/components/ScoringToggle";
 import { DEFAULT_ROSTER_POSITIONS, scoringFromRec, type SavedTeam } from "@/lib/myTeam";
+import { readScreenshot } from "@/lib/screenshot";
 import { SCORINGS, type PlayerValue, type Scoring } from "@/lib/types";
 import { LeagueError, fetchEspnLeague, fetchSleeperLeague, fetchYahooLeague, teamFromLeague, type LeagueResponse } from "./leagueClient";
 
@@ -464,62 +465,6 @@ function EspnImport({ onFinish }: { onFinish: Finish }) {
 }
 
 /* ----------------------------------------------------------- Photo / Paste */
-
-/**
- * Read the text in a roster screenshot right in the browser (free, no AI, nothing uploaded):
- * clean the image up for the reader, then run Tesseract on it.
- */
-async function readScreenshot(file: File, onProgress: (p: { pct: number; label: string }) => void): Promise<string> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("That file isn't an image."));
-      i.src = url;
-    });
-    // Small screenshots read better enlarged; huge ones are capped to stay fast.
-    const scale = Math.min(2, Math.max(1, 1600 / img.width), 4000 / Math.max(img.width, img.height));
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.width * scale);
-    c.height = Math.round(img.height * scale);
-    const ctx = c.getContext("2d", { willReadFrequently: true })!;
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-    // Grayscale, flip dark-mode screenshots to dark-on-light, and boost contrast.
-    const data = ctx.getImageData(0, 0, c.width, c.height);
-    const px = data.data;
-    let sum = 0;
-    for (let i = 0; i < px.length; i += 4) {
-      const y = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-      px[i] = y;
-      sum += y;
-    }
-    const dark = sum / (px.length / 4) < 128;
-    for (let i = 0; i < px.length; i += 4) {
-      let y = dark ? 255 - px[i] : px[i];
-      y = Math.max(0, Math.min(255, (y - 128) * 1.5 + 128));
-      px[i] = px[i + 1] = px[i + 2] = y;
-    }
-    ctx.putImageData(data, 0, 0);
-
-    onProgress({ pct: 0, label: "Getting the photo reader ready…" });
-    const { createWorker } = await import("tesseract.js");
-    const worker = await createWorker("eng", 1, {
-      logger: (m: { status: string; progress: number }) => {
-        if (m.status === "recognizing text") onProgress({ pct: m.progress, label: "Reading your roster…" });
-        else if (m.status.startsWith("loading")) onProgress({ pct: 0, label: "Getting the photo reader ready (first time takes a few seconds)…" });
-      },
-    });
-    try {
-      const { data: result } = await worker.recognize(c);
-      return result.text;
-    } finally {
-      await worker.terminate();
-    }
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 
 type RosterResult = { teamName?: string | null; matched: { id: string; name: string; starter?: boolean }[]; unmatched: string[]; slots?: string[] | null };
 
