@@ -88,7 +88,8 @@ export function Assistant({ players, scoring }: { players: PlayerValue[]; scorin
   const showHelp = () =>
     setMessages((ms) => [...ms, { role: "assistant", content: HELP_TEXT, suggestions: shuffle(EXAMPLES).slice(0, 4) }]);
 
-  const applyLineup = (ids: string[]) => team && setTeam({ ...team, starters: ids });
+  // The best lineup is what auto mode keeps, so "Set this lineup" just turns auto back on.
+  const applyLineup = () => team && setTeam({ ...team, starters: undefined, autoLineup: true });
   const scoringLabel = SCORINGS.find((s) => s.id === scoring)!.label;
   const lastAssistant = messages.map((m) => m.role).lastIndexOf("assistant");
 

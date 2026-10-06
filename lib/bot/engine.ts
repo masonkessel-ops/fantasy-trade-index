@@ -440,14 +440,15 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
     const best = bestLineup(mine, rp, score).starters;
     const bestIds = best.map((s) => s.player?.id).filter((id): id is string => !!id);
     const record = league?.teams.find((t) => t.rosterId === league.myRosterId);
-    const current = team!.starters ?? (record?.starters?.length ? record.starters : bestLineup(mine, rp).starters.map((s) => s.player?.id).filter((id): id is string => !!id));
+    const auto = team!.autoLineup !== false;
+    const current = auto ? bestIds : (team!.starters ?? (record?.starters?.length ? record.starters : bestLineup(mine, rp).starters.map((s) => s.player?.id).filter((id): id is string => !!id)));
     const total = (ids: string[]) => r1(resolve(ids).reduce((s, x) => s + proj(x), 0));
     const gain = r1(total(bestIds) - total(current));
     const ins = resolve(bestIds.filter((id) => !current.includes(id)));
     const outs = resolve(current.filter((id) => !bestIds.includes(id)));
     const same = !ins.length && !outs.length;
     const text = same
-      ? `Your lineup is already the best one${week ? ` for week ${week}` : ""}: **${total(bestIds)} projected points**.`
+      ? `${auto ? "Auto lineup is on, so your" : "Your"} lineup is already the best one${week ? ` for week ${week}` : ""}: **${total(bestIds)} projected points**.`
       : `Your best lineup${week ? ` for week ${week}` : ""} projects **${total(bestIds)} points**, ${gain > 0 ? `${gain} more than` : "the same as"} your current one. Start ${bold(ins)}; sit ${bold(outs)}.`;
     return {
       text,

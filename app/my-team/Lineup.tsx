@@ -16,8 +16,8 @@ const PROVIDER_LABEL: Record<string, string> = { sleeper: "Sleeper", espn: "ESPN
 const OUT = new Set(["Out", "IR", "PUP", "Sus", "NA"]);
 
 /**
- * Starting lineup + bench, Sleeper-style: tap Move on a player, then tap who to swap with.
- * "Best lineup" fills the slots by this week's projections (players whose game has started stay put).
+ * Starting lineup + bench. By default the lineup is set automatically to the most projected
+ * points; tap a position tag, then who to swap with, to make your own (auto turns off until re-enabled).
  */
 export function Lineup({
   team,
@@ -44,16 +44,39 @@ export function Lineup({
   const rp = team.rosterPositions;
   const [moving, setMoving] = useState<string | null>(null);
 
-  // Whose lineup: your own edits, else the league's, else the best one by value.
+  // The lineup with the most projected points for the week you're planning (next week once
+  // this one is mostly played). Players on bye or ruled out never start.
+  const planPoints = plan?.points ?? points;
+  const planWeek = plan?.week ?? week;
+  const projOf = (id: string) => {
+    const w = planPoints?.[id];
+    return !w || w.state === "bye" ? 0 : (w.projected ?? 0);
+  };
+  const projTotal = (ids: string[]) => Math.round(ids.reduce((s, id) => s + projOf(id), 0) * 10) / 10;
+  const bestFit = useMemo(() => {
+    if (!planPoints) return null;
+    const score = (p: PlayerValue) => {
+      const w = planPoints[p.id];
+      if (!w || w.state === "bye" || (p.injuryStatus && OUT.has(p.injuryStatus))) return -1 + p.value / 1000;
+      return (w.projected ?? 0) + p.value / 1000;
+    };
+    return bestLineup(roster, rp, score);
+  }, [planPoints, roster, rp]);
+  const bestIds = bestFit ? bestFit.starters.map((s) => s.player?.id).filter((id): id is string => !!id) : null;
+
+  // Auto (the default): always the best lineup. Moving a player by hand switches to your own
+  // lineup until you turn auto back on.
+  const auto = team.autoLineup !== false;
   const record = team.league?.teams.find((t) => t.rosterId === team.league!.myRosterId);
   const leagueStarters = record?.starters?.length ? record.starters : null;
   const chosen = team.starters ?? leagueStarters;
   const { starters, bench } = useMemo(() => {
+    if (auto && bestFit) return { starters: bestFit.starters, bench: [...bestFit.bench].sort((a, b) => b.value - a.value) };
     if (!chosen) return bestLineup(roster, rp);
     const set = new Set(chosen);
     const fit = bestLineup(roster.filter((p) => set.has(p.id)), rp);
     return { starters: fit.starters, bench: [...roster.filter((p) => !set.has(p.id)), ...fit.bench].sort((a, b) => b.value - a.value) };
-  }, [roster, rp, chosen]);
+  }, [auto, bestFit, roster, rp, chosen]);
   const starterIds = starters.map((s) => s.player?.id).filter((id): id is string => !!id);
   const emptySlots = starters.filter((s) => !s.player).length;
 
@@ -62,35 +85,15 @@ export function Lineup({
     return w ? (w.actual ?? w.projected ?? 0) : 0;
   };
   const total = (ids: string[]) => Math.round(ids.reduce((s, id) => s + pts(id), 0) * 10) / 10;
-
-  // Best lineup for the week you're planning (next week once this one is mostly played).
-  // Players on bye or ruled out never start.
-  const planPoints = plan?.points ?? points;
-  const planWeek = plan?.week ?? week;
-  const projOf = (id: string) => {
-    const w = planPoints?.[id];
-    return !w || w.state === "bye" ? 0 : (w.projected ?? 0);
-  };
-  const projTotal = (ids: string[]) => Math.round(ids.reduce((s, id) => s + projOf(id), 0) * 10) / 10;
-  const starterKey = starterIds.join(",");
-  const best = useMemo(() => {
-    if (!planPoints) return null;
-    const score = (p: PlayerValue) => {
-      const w = planPoints[p.id];
-      if (!w || w.state === "bye" || (p.injuryStatus && OUT.has(p.injuryStatus))) return -1 + p.value / 1000;
-      return (w.projected ?? 0) + p.value / 1000;
-    };
-    const ids = bestLineup(roster, rp, score)
-      .starters.map((s) => s.player?.id)
-      .filter((id): id is string => !!id);
-    return { ids, gain: Math.round((projTotal(ids) - projTotal(starterKey ? starterKey.split(",") : [])) * 10) / 10 };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- projTotal only reads planPoints
-  }, [planPoints, roster, rp, starterKey]);
-  const isBest = !best || [...best.ids].sort().join() === [...starterIds].sort().join();
+  const gain = bestIds ? Math.round((projTotal(bestIds) - projTotal(starterIds)) * 10) / 10 : 0;
 
   const setStarters = (ids: string[]) => {
     setMoving(null);
-    onChange({ ...team, starters: ids });
+    onChange({ ...team, starters: ids, autoLineup: false });
+  };
+  const turnOnAuto = () => {
+    setMoving(null);
+    onChange({ ...team, starters: undefined, autoLineup: true });
   };
 
   /** Would swapping these two (or moving one into an empty slot) give a legal lineup? */
@@ -123,27 +126,29 @@ export function Lineup({
     return next ? () => setStarters(next) : null;
   };
 
-  const note = team.starters
-    ? leagueStarters
-      ? `Your edits (your ${PROVIDER_LABEL[team.source] ?? "league"} lineup isn't changed).`
-      : "Your lineup."
-    : leagueStarters
-      ? `As set in your ${PROVIDER_LABEL[team.source] ?? ""} league.`
-      : "Best lineup by trade value.";
+  // The site can't set a real league's lineup, so spell out the moves to make there.
+  const provider = PROVIDER_LABEL[team.source] ?? "your league";
+  const nameOf = (id: string) => roster.find((p) => p.id === id)?.name;
+  const leagueMoves =
+    auto && leagueStarters && bestIds
+      ? {
+          start: bestIds.filter((id) => !leagueStarters.includes(id)).map(nameOf).filter(Boolean) as string[],
+          sit: leagueStarters.filter((id) => !bestIds.includes(id)).map(nameOf).filter(Boolean) as string[],
+        }
+      : null;
+
+  const note = auto
+    ? bestFit
+      ? `Auto: the lineup with the most projected points${planWeek ? ` for week ${planWeek}` : ""}. It updates for injuries and byes. Tap a position tag to make your own changes.`
+      : "Setting your best lineup…"
+    : "Your own lineup. Tap a position tag to move a player.";
 
   return (
     <section className="card animate-rise p-4 [animation-delay:120ms] sm:p-5">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="max-w-xl">
           <h2 className="font-display text-2xl font-bold uppercase tracking-wide">Lineup</h2>
-          <p className="text-xs text-muted">
-            {note} Tap a position tag to move a player.{" "}
-            {team.starters && (
-              <button onClick={() => onChange({ ...team, starters: undefined })} className="font-semibold text-rocket hover:underline">
-                {leagueStarters ? "Use league lineup" : "Reset"}
-              </button>
-            )}
-          </p>
+          <p className="text-xs text-muted">{note}</p>
         </div>
         <div className="flex items-center gap-2">
           {points && (
@@ -158,21 +163,33 @@ export function Lineup({
               <div className="text-[10px] font-semibold uppercase tracking-wider text-faint">Wk {plan.week} proj</div>
             </div>
           )}
-          {best && (
+          {auto ? (
+            <span className="inline-flex h-10 items-center gap-1.5 rounded-full bg-up/10 px-4 text-sm font-bold text-up" title="Your lineup is set automatically to score the most points">
+              <Check className="size-4" /> Auto lineup
+            </span>
+          ) : (
             <button
-              onClick={() => setStarters(best.ids)}
-              disabled={isBest}
-              className={clsx(
-                "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-bold transition",
-                isBest ? "bg-up/10 text-up" : "bg-gradient-to-r from-rocket to-flame text-bg hover:brightness-110",
-              )}
+              onClick={turnOnAuto}
+              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-rocket to-flame px-4 text-sm font-bold text-bg transition hover:brightness-110"
             >
-              {isBest ? <Check className="size-4" /> : <Sparkles className="size-4" />}
-              {isBest ? `Best for week ${planWeek}` : `Best lineup${best.gain > 0 ? ` +${best.gain}` : ""}`}
+              <Sparkles className="size-4" /> Auto lineup{gain > 0 ? ` +${gain}` : ""}
             </button>
           )}
         </div>
       </div>
+
+      {leagueMoves && (leagueMoves.start.length > 0 || leagueMoves.sit.length > 0) && (
+        <p className="mb-3 rounded-xl border border-flame/30 bg-flame/10 px-3 py-2 text-xs text-flame">
+          To score the most, make these moves in {provider}: start <b>{leagueMoves.start.join(", ")}</b>
+          {leagueMoves.sit.length > 0 && (
+            <>
+              {" "}
+              and bench <b>{leagueMoves.sit.join(", ")}</b>
+            </>
+          )}
+          .
+        </p>
+      )}
 
       <AnimatePresence>
         {moving && (

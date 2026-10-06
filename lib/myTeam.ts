@@ -40,8 +40,10 @@ export interface SavedTeam {
     username: string;
     provider?: LeagueProvider;
   };
-  /** for non-league teams: player ids in the starting lineup (league teams use league.teams[].starters) */
+  /** your own lineup (player ids), used when autoLineup is off */
   starters?: string[];
+  /** lineup is set automatically to the most projected points (default: on) */
+  autoLineup?: boolean;
   /** id -> basic info for rostered players who aren't on the value chart */
   directory: Record<string, { name: string; position: string; team: string | null }>;
   updatedAt: number;
