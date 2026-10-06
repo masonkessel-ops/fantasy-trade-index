@@ -98,6 +98,7 @@ export function TradeAnalyzer({
           adjusted={Math.round(result.adjGive)}
           searchPool={players}
           quickPicks={myRoster}
+          picksLabel="Your team"
           exclude={inTrade}
           onAdd={(id) => add("give", id)}
           onRemove={(id) => remove("give", id)}
@@ -116,6 +117,7 @@ export function TradeAnalyzer({
           adjusted={Math.round(result.adjGet)}
           searchPool={players}
           quickPicks={partnerRoster}
+          picksLabel={partnerTeam ? `${partnerTeam.teamName}` : "Their team"}
           exclude={inTrade}
           onAdd={(id) => add("get", id)}
           onRemove={(id) => remove("get", id)}
@@ -231,6 +233,7 @@ function SidePanel({
   adjusted,
   searchPool,
   quickPicks,
+  picksLabel,
   exclude,
   onAdd,
   onRemove,
@@ -243,6 +246,7 @@ function SidePanel({
   adjusted: number;
   searchPool: PlayerValue[];
   quickPicks: PlayerValue[];
+  picksLabel: string;
   exclude: string[];
   onAdd: (id: string) => void;
   onRemove: (id: string) => void;
@@ -268,18 +272,31 @@ function SidePanel({
       </div>
       <PlayerSearch players={searchPool} exclude={exclude} onSelect={(p) => onAdd(p.id)} placeholder="Add a player…" />
       {picks.length > 0 && (
-        <div className="no-scrollbar -mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5">
-          {picks.slice(0, 20).map((p) => (
-            <button
-              key={p.id}
-              onClick={() => onAdd(p.id)}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface-2 py-1 pl-1 pr-2.5 text-xs font-medium text-muted transition hover:border-line-strong hover:text-ink"
-            >
-              <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={22} />
-              {p.name.split(" ").slice(-1)[0]}
-              <span className="text-faint">{p.value}</span>
-            </button>
-          ))}
+        <div className="mt-3 rounded-xl border border-line bg-bg/30">
+          <div className="flex items-center justify-between px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.15em] text-faint">
+            <span>{picksLabel} · tap to add</span>
+            <span>{picks.length}</span>
+          </div>
+          <ul className="grid max-h-56 grid-cols-[minmax(0,1fr)] gap-0.5 overflow-y-auto overscroll-contain p-1.5 sm:grid-cols-2">
+            {picks.map((p) => (
+              <li key={p.id}>
+                <button
+                  onClick={() => onAdd(p.id)}
+                  className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left transition hover:bg-white/[0.05]"
+                >
+                  <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={26} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold leading-tight">{p.name}</span>
+                    <span className="text-[10px] text-muted">
+                      {p.position} · {p.team ?? "FA"}
+                    </span>
+                  </span>
+                  <span className="text-xs font-bold text-muted tabular">{p.value}</span>
+                  <Plus className="size-3.5 shrink-0 text-faint" />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <ul className="mt-4 min-h-24 space-y-1.5">

@@ -4,14 +4,22 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import clsx from "clsx";
-import { ArrowRight, ArrowUp, Bot, KeyRound, RotateCcw, Sparkles, Square, Users } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, MessagesSquare, RotateCcw, Sparkles, Square, Users, Zap } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { Markdown } from "@/components/Markdown";
 import { TradeIdeaCard } from "@/components/TradeIdeaCard";
+import { ChangePill, InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
+import { RiskTag } from "@/components/RiskReward";
 import { useMyTeam, type SavedTeam } from "@/lib/myTeam";
+import { buildNameIndex } from "@/lib/bot/names";
+import { EXAMPLES, answer, helpReply, type Block, type WeekData } from "@/lib/bot/engine";
+import { playerRisk } from "@/lib/risk";
+import { SLOT_ELIGIBLE, SLOT_LABEL, gradeColor } from "@/lib/teamAnalysis";
+import { POS_COLOR } from "@/lib/ui";
 import { SCORINGS, type PlayerValue, type Scoring } from "@/lib/types";
 
-interface Trade {
+/** Trade cards from the AI backup (same shape the AI route streams). */
+interface AiTrade {
   title: string;
   give: string[];
   get: string[];
@@ -21,9 +29,12 @@ interface Trade {
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-  trades?: Trade[];
+  blocks?: Block[];
+  suggestions?: string[];
+  trades?: AiTrade[];
   error?: string;
   streaming?: boolean;
+  ai?: boolean;
 }
 
 function teamPayload(team: SavedTeam | null) {
@@ -35,37 +46,40 @@ function teamPayload(team: SavedTeam | null) {
     scoringSettings: team.league?.scoringSettings,
     leagueName: team.league?.name,
     totalRosters: team.league?.totalRosters,
-    leagueTeams: team.league?.teams.map((t) => ({
-      teamName: t.teamName,
-      players: t.players,
-      mine: t.rosterId === team.league!.myRosterId,
-    })),
+    leagueTeams: team.league?.teams.map((t) => ({ teamName: t.teamName, players: t.players, mine: t.rosterId === team.league!.myRosterId })),
   };
 }
 
 export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]; scoring: Scoring; hasKey: boolean }) {
-  const [team, , hydrated] = useMyTeam();
+  const [team, setTeam, hydrated] = useMyTeam();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const focus = useRef<string[]>([]);
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const weekCache = useRef(new Map<string, Promise<WeekData>>());
   const board = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
-
-  const suggestions = useMemo(() => {
-    const mine = team ? team.playerIds.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p) : [];
-    const star = [...mine].sort((a, b) => b.value - a.value)[0];
-    return [
-      "I want to trade for a top 5 WR. What's a fair offer?",
-      star ? `Who should I trade ${star.name} for?` : "Who should I trade Malik Nabers for?",
-      team ? "What's my team's biggest weakness, and how do I fix it with a trade?" : "Which players are the best sell-high candidates right now?",
-      "Which RBs are buy-low candidates after a slow start?",
-    ];
-  }, [team, board]);
+  const names = useMemo(() => buildNameIndex(players), [players]);
+  const mine = useMemo(() => (team ? team.playerIds.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p).sort((a, b) => b.value - a.value) : []), [team, board]);
+  const starters = useMemo(() => helpReply(mine, players).suggestions, [mine, players]);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (messages.length) bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  const loadWeek = (ids: string[]) => {
+    const key = [...ids].sort().join(",");
+    let p = weekCache.current.get(key);
+    if (!p) {
+      p = fetch(`/api/week-points?ids=${key}&scoring=${scoring}`)
+        .then((r) => r.json())
+        .then((d) => ({ week: d.week ?? null, points: d.points ?? {}, plan: d.plan ?? null }) as WeekData)
+        .catch(() => ({ week: null, points: {}, plan: null }));
+      weekCache.current.set(key, p);
+    }
+    return p;
+  };
 
   async function send(text: string) {
     const q = text.trim();
@@ -74,26 +88,44 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
     setMessages([...history, { role: "assistant", content: "", streaming: true }]);
     setInput("");
     setBusy(true);
+    const update = (fn: (m: ChatMessage) => ChatMessage) => setMessages((ms) => [...ms.slice(0, -1), fn(ms[ms.length - 1])]);
+
+    try {
+      const reply = await answer(q, { players, team, names, loadWeek }, focus.current);
+      if (reply) {
+        if (reply.focus.length) focus.current = reply.focus;
+        update(() => ({ role: "assistant", content: reply.text, blocks: reply.blocks, suggestions: reply.suggestions }));
+      } else if (hasKey) {
+        await askAi(history, update);
+      } else {
+        update(() => ({
+          role: "assistant",
+          content: "I didn't catch that. I'm built for trade, value and lineup questions, and I answer from the numbers (no AI). Try one of these:",
+          suggestions: shuffle(EXAMPLES).slice(0, 4),
+        }));
+      }
+    } catch (err) {
+      update((m) => ({ ...m, streaming: false, error: (err as Error).message || "Something went wrong." }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Anything the built-in rules don't understand goes to Claude, when an API key is set. */
+  async function askAi(history: ChatMessage[], update: (fn: (m: ChatMessage) => ChatMessage) => void) {
     const ctrl = new AbortController();
     abort.current = ctrl;
-
-    const update = (fn: (m: ChatMessage) => ChatMessage) =>
-      setMessages((ms) => [...ms.slice(0, -1), fn(ms[ms.length - 1])]);
-
+    update((m) => ({ ...m, ai: true }));
     try {
       const res = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: ctrl.signal,
-        body: JSON.stringify({
-          scoring,
-          team: teamPayload(team),
-          messages: history.map((m) => ({ role: m.role, content: m.content })),
-        }),
+        body: JSON.stringify({ scoring, team: teamPayload(team), messages: history.slice(-8).map((m) => ({ role: m.role, content: m.content || "(see cards)" })) }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error === "missing_key" ? "The AI assistant isn't set up yet: ANTHROPIC_API_KEY is missing." : data.error || "Something went wrong.");
+        throw new Error(data.error === "missing_key" ? "The AI backup isn't set up." : data.error || "Something went wrong.");
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -116,23 +148,26 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
       if ((err as Error).name !== "AbortError") update((m) => ({ ...m, error: (err as Error).message }));
     } finally {
       update((m) => ({ ...m, streaming: false, content: m.content.trimEnd() }));
-      setBusy(false);
       abort.current = null;
     }
   }
 
+  const applyLineup = (ids: string[]) => team && setTeam({ ...team, starters: ids });
   const scoringLabel = SCORINGS.find((s) => s.id === scoring)!.label;
+  const lastAssistant = messages.map((m) => m.role).lastIndexOf("assistant");
 
   return (
     <div className="flex min-h-[calc(100dvh-10rem)] flex-col lg:min-h-[calc(100dvh-5rem)]">
       <header className="mb-4 flex animate-rise flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-rocket">Powered by Claude</p>
+          <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-rocket">
+            <Zap className="size-3.5" /> Instant answers · no AI needed
+          </p>
           <h1 className="font-display text-4xl font-extrabold uppercase italic leading-[0.95] sm:text-5xl">
-            AI Trade <span className="text-gradient">Assistant</span>
+            Trade <span className="text-gradient">Assistant</span>
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {hydrated && (
             <Link
               href="/my-team"
@@ -142,14 +177,20 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
               )}
             >
               <Users className="size-3.5" />
-              {team ? `${team.name} · ${scoringLabel}` : "No team, import yours"}
+              {team ? `${team.name} · ${scoringLabel}` : "No team yet: add yours"}
             </Link>
+          )}
+          {hasKey && (
+            <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-volt/30 bg-volt/10 px-3 text-xs font-semibold text-volt" title="Questions the assistant doesn't understand are passed to Claude">
+              <Sparkles className="size-3.5" /> AI backup on
+            </span>
           )}
           {messages.length > 0 && (
             <button
               onClick={() => {
                 abort.current?.abort();
                 setMessages([]);
+                focus.current = [];
               }}
               className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted hover:text-ink"
             >
@@ -159,52 +200,37 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
         </div>
       </header>
 
-      {!hasKey && (
-        <div className="card mb-4 flex gap-3 border-flame/30 p-4 text-sm">
-          <KeyRound className="mt-0.5 size-5 shrink-0 text-flame" />
-          <div className="text-muted">
-            <p className="font-semibold text-ink">Add your Anthropic API key to turn on the assistant</p>
-            Create <code className="rounded bg-surface-3 px-1 text-ink">.env.local</code> with{" "}
-            <code className="rounded bg-surface-3 px-1 text-ink">ANTHROPIC_API_KEY=sk-ant-…</code> and restart the dev server. On Vercel, add it under
-            Project → Settings → Environment Variables.
-          </div>
-        </div>
-      )}
-
       <div className="flex-1 space-y-6 pb-6">
         {messages.length === 0 ? (
-          <div className="flex animate-rise flex-col items-center px-2 pt-6 text-center [animation-delay:80ms] sm:pt-12">
-            <motion.div
-              initial={{ scale: 0.6, rotate: -20, opacity: 0 }}
-              animate={{ scale: 1, rotate: 0, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 16 }}
-            >
+          <div className="flex animate-rise flex-col items-center px-2 pt-6 text-center [animation-delay:80ms] sm:pt-10">
+            <motion.div initial={{ scale: 0.6, rotate: -20, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 16 }}>
               <LogoMark className="size-16 shadow-[0_10px_40px_-10px] shadow-rocket/70" />
             </motion.div>
             <h2 className="mt-5 font-display text-2xl font-bold uppercase">Ask me about any trade</h2>
             <p className="mt-1 max-w-md text-sm text-muted">
-              I see live trade values{team ? `, your roster${team.league ? " and every team in your league" : ""}` : ""}, so answers use real numbers.
+              I answer instantly from live trade values{team ? `, your roster${team.league ? " and every team in your league" : ""}` : ""} and this week&apos;s projections.
             </p>
-            <div className="mt-6 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
-              {suggestions.map((s, i) => (
+            <div className="mt-6 grid w-full max-w-2xl grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
+              {[...starters, ...EXAMPLES.filter((e) => /rising|Top 10|Grade|Buy low/.test(e))].slice(0, 8).map((s, i) => (
                 <motion.button
                   key={s}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15 + i * 0.06 }}
+                  transition={{ delay: 0.12 + i * 0.04 }}
                   onClick={() => send(s)}
-                  disabled={!hasKey}
-                  className="group flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 text-left text-sm transition hover:border-rocket/40 hover:bg-surface-2 disabled:opacity-50"
+                  className="group flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 text-left text-sm transition hover:border-rocket/40 hover:bg-surface-2"
                 >
-                  <Sparkles className="size-4 shrink-0 text-flame" />
-                  <span className="flex-1">{s}</span>
+                  <MessagesSquare className="size-4 shrink-0 text-flame" />
+                  <span className="min-w-0 flex-1">{s}</span>
                   <ArrowRight className="size-4 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-rocket" />
                 </motion.button>
               ))}
             </div>
           </div>
         ) : (
-          messages.map((m, i) => <Message key={i} m={m} board={board} team={team} />)
+          messages.map((m, i) => (
+            <Message key={i} m={m} board={board} team={team} mine={mine} onAsk={send} onApply={applyLineup} showSuggestions={i === lastAssistant && !busy} />
+          ))
         )}
         <div ref={bottom} />
       </div>
@@ -228,22 +254,16 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
               }
             }}
             rows={1}
-            placeholder={hasKey ? "Ask about a trade…" : "Add an API key to chat"}
-            disabled={!hasKey}
+            placeholder='Try "Walker for Puka?" or "Who should I start?"'
             className="max-h-40 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm outline-none [field-sizing:content] placeholder:text-faint"
           />
-          {busy ? (
-            <button
-              type="button"
-              onClick={() => abort.current?.abort()}
-              className="grid size-11 shrink-0 place-items-center rounded-xl bg-surface-3 text-ink transition hover:bg-white/10"
-              aria-label="Stop"
-            >
+          {busy && abort.current ? (
+            <button type="button" onClick={() => abort.current?.abort()} className="grid size-11 shrink-0 place-items-center rounded-xl bg-surface-3 text-ink transition hover:bg-white/10" aria-label="Stop">
               <Square className="size-4 fill-current" />
             </button>
           ) : (
             <button
-              disabled={!input.trim() || !hasKey}
+              disabled={!input.trim() || busy}
               className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-rocket to-flame text-bg transition hover:brightness-110 disabled:opacity-40"
               aria-label="Send"
             >
@@ -256,22 +276,40 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
   );
 }
 
-function Message({ m, board, team }: { m: ChatMessage; board: Map<string, PlayerValue>; team: SavedTeam | null }) {
+function shuffle<T>(xs: T[]) {
+  return [...xs].sort(() => Math.random() - 0.5);
+}
+
+function Message({
+  m,
+  board,
+  team,
+  mine,
+  onAsk,
+  onApply,
+  showSuggestions,
+}: {
+  m: ChatMessage;
+  board: Map<string, PlayerValue>;
+  team: SavedTeam | null;
+  mine: PlayerValue[];
+  onAsk: (q: string) => void;
+  onApply: (ids: string[]) => void;
+  showSuggestions: boolean;
+}) {
   if (m.role === "user") {
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-gradient-to-br from-rocket to-[#ff7a2c] px-4 py-2.5 text-sm font-medium text-bg">
-          {m.content}
-        </div>
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-gradient-to-br from-rocket to-[#ff7a2c] px-4 py-2.5 text-sm font-medium text-bg">{m.content}</div>
       </motion.div>
     );
   }
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl border border-line-strong bg-surface-2 text-rocket">
-        <Bot className="size-4" />
+      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl border border-line-strong bg-surface-2">
+        <LogoMark className="size-5" />
       </span>
-      <div className="min-w-0 flex-1 text-sm text-ink/90">
+      <div className="min-w-0 flex-1 space-y-3 text-sm text-ink/90">
         {m.content ? (
           <>
             <Markdown text={m.content} />
@@ -289,36 +327,278 @@ function Message({ m, board, team }: { m: ChatMessage; board: Map<string, Player
                 />
               ))}
             </span>
-            Crunching the numbers…
+            {m.ai ? "Asking the AI…" : "Crunching the numbers…"}
           </div>
         ) : null}
-        {m.error && <p className="mt-2 rounded-xl bg-down/10 px-3 py-2 text-down">{m.error}</p>}
+        {m.error && <p className="rounded-xl bg-down/10 px-3 py-2 text-down">{m.error}</p>}
+        {m.blocks?.map((b, i) => <BlockView key={i} b={b} board={board} mine={mine} team={team} onAsk={onAsk} onApply={onApply} />)}
         <AnimatePresence>
           {m.trades && m.trades.length > 0 && (
-            <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 2xl:grid-cols-3">
               {m.trades.map((t, i) => (
-                <TradeCard key={i} trade={t} board={board} team={team} index={i} />
+                <TradeIdeaCard
+                  key={i}
+                  index={i}
+                  title={t.title}
+                  subtitle={t.partner ? `with ${t.partner}` : null}
+                  give={t.give}
+                  get={t.get}
+                  board={board}
+                  partnerRosterId={team?.league?.teams.find((x) => x.teamName.toLowerCase() === t.partner?.toLowerCase())?.rosterId}
+                  note={t.why}
+                />
               ))}
             </div>
           )}
         </AnimatePresence>
+        {m.ai && !m.streaming && <p className="text-[11px] text-faint">Answered by the AI backup.</p>}
+        {showSuggestions && m.suggestions && m.suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {m.suggestions.map((s) => (
+              <button
+                key={s}
+                onClick={() => onAsk(s)}
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-muted transition hover:border-rocket/40 hover:text-ink"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );
 }
 
-function TradeCard({ trade, board, team, index }: { trade: Trade; board: Map<string, PlayerValue>; team: SavedTeam | null; index: number }) {
-  const partner = team?.league?.teams.find((t) => t.teamName.toLowerCase() === trade.partner?.toLowerCase());
+function BlockView({
+  b,
+  board,
+  mine,
+  team,
+  onAsk,
+  onApply,
+}: {
+  b: Block;
+  board: Map<string, PlayerValue>;
+  mine: PlayerValue[];
+  team: SavedTeam | null;
+  onAsk: (q: string) => void;
+  onApply: (ids: string[]) => void;
+}) {
+  switch (b.kind) {
+    case "player": {
+      const p = board.get(b.id);
+      return p ? <PlayerCard p={p} mine={mine.some((x) => x.id === p.id)} /> : null;
+    }
+    case "players":
+      return (
+        <ol className="overflow-hidden rounded-2xl border border-line bg-surface">
+          {b.ids.map((id, i) => {
+            const p = board.get(id);
+            if (!p) return null;
+            return (
+              <li key={id} className="border-b border-line last:border-0">
+                <button onClick={() => onAsk(`What's ${p.name} worth?`)} className="flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-white/[0.03]">
+                  <span className="w-5 text-center font-display text-sm font-bold text-faint">{i + 1}</span>
+                  <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate font-semibold">{p.name}</span>
+                      <InjuryTag status={p.injuryStatus} />
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted">
+                      <PosBadge pos={p.position} /> {p.team ?? "FA"} · {p.ppg} ppg
+                    </span>
+                  </span>
+                  {b.show === "change" && <ChangePill change={p.change} />}
+                  <ValueBadge value={p.value} size="sm" />
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      );
+    case "trades":
+      return (
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          {b.cards.map((c, i) => (
+            <TradeIdeaCard key={`${c.give.join()}-${c.get.join()}`} index={i} title={c.title} subtitle={c.subtitle} give={c.give} get={c.get} board={board} partnerRosterId={c.partnerRosterId} note={c.note} />
+          ))}
+        </div>
+      );
+    case "compare":
+      return <CompareTable ids={b.ids} board={board} week={b.week} proj={b.proj} />;
+    case "lineup":
+      return <LineupCard b={b} board={board} team={team} onApply={onApply} />;
+    case "grades":
+      return (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {b.strengths.map((s) => (
+            <button key={s.position} onClick={() => onAsk(`Top 10 ${s.position === "DST" ? "defenses" : `${s.position}s`}`)} className="rounded-2xl border border-line bg-surface p-3 text-center transition hover:border-line-strong">
+              <PosBadge pos={s.position} />
+              <div className="mt-1.5 font-display text-3xl font-extrabold leading-none" style={{ color: gradeColor(s.grade) }}>
+                {s.grade}
+              </div>
+              <div className="mt-1 text-[10px] text-faint tabular">{Math.round(s.ratio * 100)}% of avg</div>
+            </button>
+          ))}
+        </div>
+      );
+    case "link":
+      return (
+        <Link href={b.href} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-rocket/40 bg-rocket/10 px-4 text-xs font-bold text-rocket transition hover:bg-rocket/20">
+          {b.label} <ArrowRight className="size-3.5" />
+        </Link>
+      );
+  }
+}
+
+function PlayerCard({ p, mine }: { p: PlayerValue; mine: boolean }) {
+  const stats: [string, string | number][] = [
+    ["Pos rank", `${p.position}${p.posRank}`],
+    ["Season PPG", p.ppg],
+    ["Last 3", p.recentPpg ?? "–"],
+    ["ROS proj", p.rosPpg],
+  ];
   return (
-    <TradeIdeaCard
-      title={trade.title}
-      subtitle={trade.partner ? `with ${trade.partner}` : null}
-      give={trade.give}
-      get={trade.get}
-      board={board}
-      partnerRosterId={partner?.rosterId}
-      note={trade.why}
-      index={index}
-    />
+    <div className="rounded-2xl border border-line-strong bg-gradient-to-b from-surface-2 to-surface p-4">
+      <div className="flex items-center gap-3">
+        <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={52} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-display text-xl font-bold uppercase leading-tight">{p.name}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+            <PosBadge pos={p.position} /> {p.team ?? "FA"}
+            {p.age ? ` · ${p.age} yrs` : ""} <InjuryTag status={p.injuryStatus} /> <RiskTag p={p} />
+          </div>
+        </div>
+        <ValueBadge value={p.value} />
+      </div>
+      <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
+        {stats.map(([label, v]) => (
+          <div key={label} className="rounded-xl bg-white/[0.04] py-2">
+            <div className="font-display text-lg font-bold tabular">{v}</div>
+            <div className="text-[9px] uppercase tracking-wider text-faint">{label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href={`/trade-finder?${mine ? "away" : "want"}=${p.id}`}
+          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-gradient-to-r from-rocket to-flame px-4 text-xs font-bold text-bg transition hover:brightness-110"
+        >
+          {mine ? "Trade away" : "What would it take?"} <ArrowRight className="size-3.5" />
+        </Link>
+        <Link href={`/players/${p.id}`} className="inline-flex h-9 items-center rounded-full border border-line-strong px-4 text-xs font-semibold text-muted transition hover:text-ink">
+          Full stats
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function CompareTable({ ids, board, week, proj }: { ids: string[]; board: Map<string, PlayerValue>; week: number | null; proj: Record<string, number | null> | null }) {
+  const ps = ids.map((id) => board.get(id)).filter((p): p is PlayerValue => !!p).slice(0, 4);
+  const rows: { label: string; get: (p: PlayerValue) => number | null; fmt?: (n: number) => string; low?: boolean }[] = [
+    ...(proj ? [{ label: `Week ${week ?? ""} proj`, get: (p: PlayerValue) => proj[p.id] ?? null }] : []),
+    { label: "Trade value", get: (p) => p.value },
+    { label: "Trade weight", get: (p) => Math.round(p.power) },
+    { label: "Season PPG", get: (p) => p.ppg },
+    { label: "Last 3 PPG", get: (p) => p.recentPpg },
+    { label: "ROS PPG", get: (p) => p.rosPpg },
+    { label: "Risk", get: (p) => playerRisk(p).score, fmt: (n) => (n < 0.2 ? "Low" : n < 0.45 ? "Med" : "High"), low: true },
+  ];
+  return (
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="grid border-b border-line" style={{ gridTemplateColumns: `minmax(5.5rem,1fr) repeat(${ps.length}, minmax(0,1fr))` }}>
+        <span />
+        {ps.map((p) => (
+          <div key={p.id} className="flex flex-col items-center gap-1 px-1 py-3 text-center">
+            <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={36} />
+            <span className="w-full truncate text-xs font-semibold">{p.name}</span>
+            <span className="text-[10px] text-muted">
+              {p.position}
+              {p.posRank} · {p.team ?? "FA"}
+            </span>
+          </div>
+        ))}
+      </div>
+      {rows.map((r) => {
+        const vals = ps.map(r.get);
+        const nums = vals.filter((v): v is number => v !== null);
+        const best = nums.length ? (r.low ? Math.min(...nums) : Math.max(...nums)) : null;
+        return (
+          <div key={r.label} className="grid border-b border-line text-sm last:border-0" style={{ gridTemplateColumns: `minmax(5.5rem,1fr) repeat(${ps.length}, minmax(0,1fr))` }}>
+            <span className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-faint">{r.label}</span>
+            {vals.map((v, i) => (
+              <span key={i} className={clsx("py-2 text-center font-display text-base font-bold tabular", v !== null && v === best && nums.length > 1 ? "text-up" : "text-ink/80")}>
+                {v === null ? "–" : r.fmt ? r.fmt(v) : v}
+              </span>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LineupCard({ b, board, team, onApply }: { b: Extract<Block, { kind: "lineup" }>; board: Map<string, PlayerValue>; team: SavedTeam | null; onApply: (ids: string[]) => void }) {
+  const [done, setDone] = useState(false);
+  const total = Math.round(b.slots.reduce((s, x) => s + (x.proj ?? 0), 0) * 10) / 10;
+  return (
+    <div className="rounded-2xl border border-line-strong bg-surface p-3">
+      <div className="mb-2 flex items-center justify-between px-1">
+        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-faint">Best lineup{b.week ? ` · week ${b.week}` : ""}</span>
+        <span className="font-display text-lg font-bold text-gradient tabular">{total} pts</span>
+      </div>
+      <ul className="space-y-1">
+        {b.slots.map((s, i) => {
+          const p = s.id ? board.get(s.id) : null;
+          const eligible = SLOT_ELIGIBLE[s.slot];
+          const color = eligible?.length === 1 ? POS_COLOR[eligible[0]] : undefined;
+          return (
+            <li key={i} className="flex items-center gap-2.5 rounded-xl bg-surface-2 px-2 py-1.5">
+              <span
+                className="grid h-7 w-11 shrink-0 place-items-center rounded-lg text-[10px] font-bold"
+                style={color ? { color, background: `color-mix(in srgb, ${color} 15%, transparent)` } : { background: "rgb(255 255 255 / 0.05)" }}
+              >
+                {SLOT_LABEL[s.slot] ?? s.slot}
+              </span>
+              {p ? (
+                <>
+                  <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={28} />
+                  <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
+                  <span className="font-display font-bold tabular">{s.proj ?? "–"}</span>
+                </>
+              ) : (
+                <span className="flex-1 text-faint">Empty</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {b.apply && team && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              onApply(b.apply!);
+              setDone(true);
+            }}
+            disabled={done}
+            className={clsx(
+              "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-bold transition",
+              done ? "bg-up/10 text-up" : "bg-gradient-to-r from-rocket to-flame text-bg hover:brightness-110",
+            )}
+          >
+            {done ? <Check className="size-4" /> : <Sparkles className="size-4" />}
+            {done ? "Lineup set" : `Set this lineup${b.gain > 0 ? ` (+${b.gain})` : ""}`}
+          </button>
+          {done && (
+            <Link href="/my-team" className="text-xs font-semibold text-rocket hover:underline">
+              See it on My Team →
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

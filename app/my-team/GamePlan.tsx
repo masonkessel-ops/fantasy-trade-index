@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Bot, Loader2, Repeat2, Sparkles, UserPlus } from "lucide-react";
+import { ArrowRight, Loader2, MessagesSquare, Repeat2, Sparkles, UserPlus } from "lucide-react";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { TradeIdeaCard } from "@/components/TradeIdeaCard";
 import type { SavedTeam } from "@/lib/myTeam";
@@ -90,7 +90,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
               href="/assistant"
               className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:text-ink"
             >
-              <Bot className="size-3.5" /> Ask the AI
+              <MessagesSquare className="size-3.5" /> Ask the assistant
             </Link>
             <Link
               href="/trade-finder"

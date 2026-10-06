@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Bot, Flame, Radio, TrendingDown, Repeat, TrendingUp, Users } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Flame, MessagesSquare, Radio, TrendingDown, Repeat, TrendingUp, Users } from "lucide-react";
 import { ChangePill, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { Sparkline } from "@/components/Charts";
 import { getLiveWeek } from "@/lib/live";
@@ -148,7 +148,7 @@ export default async function Home() {
         {[
           { href: "/trade", icon: ArrowLeftRight, title: "Trade Analyzer", text: "Get a verdict on any deal" },
           { href: "/trade-finder", icon: Repeat, title: "Trade Finder", text: "Fair trades from your roster" },
-          { href: "/assistant", icon: Bot, title: "AI Assistant", text: "Ask Claude about trades" },
+          { href: "/assistant", icon: MessagesSquare, title: "Trade Assistant", text: "Ask anything, instant answers" },
           { href: "/my-team", icon: Users, title: "My Team", text: "Sleeper, ESPN, photo or paste" },
         ].map((f) => (
           <Link key={f.href} href={f.href} className="card group p-4 transition hover:-translate-y-0.5 hover:border-rocket/40">
