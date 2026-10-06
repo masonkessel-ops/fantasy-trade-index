@@ -117,8 +117,9 @@ export async function matchRosterText(text: string) {
   }
   // Small misspellings, mostly from reading screenshots ("Kenneth Waiker"): the closest
   // fantasy-relevant player, only when one name is clearly closest.
+  // Players already found stay in the comparison, so "Bijan Robinson" can't be read as a typo of "Brian Robinson".
   const relevant = players
-    .filter((p) => p.position !== "DST" && p.team && p.searchRank !== null && p.searchRank <= 800 && !found.has(p.id))
+    .filter((p) => p.position !== "DST" && ((p.team && p.searchRank !== null && p.searchRank <= 800) || found.has(p.id)))
     .map((p) => ({ p, full: normalizeName(p.name) }))
     .filter((x) => x.full.includes(" ") && x.full.length >= 7);
   for (const [lineIdx, line] of lines.entries()) {
@@ -133,14 +134,14 @@ export async function matchRosterText(text: string) {
         let best: { d: number; p: Player } | null = null;
         let tie = false;
         for (const k of relevant) {
-          if (found.has(k.p.id) || Math.abs(k.full.length - phrase.length) > max) continue;
+          if (Math.abs(k.full.length - phrase.length) > max) continue;
           if (k.full[0] !== phrase[0] && k.full.split(" ").at(-1)![0] !== lastInitial) continue;
           const d = editDistance(phrase, k.full, max);
           if (d > max) continue;
           if (!best || d < best.d) [best, tie] = [{ d, p: k.p }, false];
           else if (d === best.d && best.p.id !== k.p.id) tie = true;
         }
-        if (best && !tie && best.d > 0) {
+        if (best && !tie && best.d > 0 && !found.has(best.p.id)) {
           found.set(best.p.id, { id: best.p.id, name: best.p.name, position: best.p.position, team: best.p.team });
           lineOf.set(best.p.id, lineIdx);
         }
