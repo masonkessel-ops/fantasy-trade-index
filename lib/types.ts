@@ -62,8 +62,10 @@ export interface PlayerValue {
   age: number | null;
   injuryStatus: string | null;
   value: number;
-  /** trade weight 0–100 (value^TRADE_CURVE, stars cost a premium); trade fairness uses this */
+  /** trade weight 0–100: share of the best player's worth (linear, like market trade value); trade fairness uses this */
   power: number;
+  /** rank in the FantasyCalc trade market (null if unranked or the market is unavailable) */
+  marketRank: number | null;
   /** value change vs. one week ago (null if no history) */
   change: number | null;
   overallRank: number;

@@ -11,6 +11,7 @@ import {
   Home,
   Menu,
   Radio,
+  Repeat,
   Trophy,
   Users,
   X,
@@ -29,17 +30,19 @@ export const NAV: NavItem[] = [
   { href: "/", label: "Home", short: "Home", icon: Home },
   { href: "/values", label: "Trade Values", short: "Values", icon: BarChart3 },
   { href: "/trade", label: "Trade Analyzer", short: "Trade", icon: ArrowLeftRight },
+  { href: "/trade-finder", label: "Trade Finder", short: "Finder", icon: Repeat },
   { href: "/assistant", label: "AI Assistant", short: "AI", icon: Bot },
   { href: "/live", label: "Live Tracker", short: "Live", icon: Radio },
   { href: "/team-of-the-week", label: "Team of the Week", short: "TOTW", icon: Trophy },
   { href: "/my-team", label: "My Team", short: "My Team", icon: Users },
 ];
 
-const BOTTOM = ["/values", "/trade", "/assistant", "/live"];
+const BOTTOM = ["/values", "/trade", "/trade-finder", "/assistant"];
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   if (href === "/values") return pathname.startsWith("/values") || pathname.startsWith("/players");
+  if (href === "/trade") return pathname === "/trade";
   return pathname.startsWith(href);
 }
 

@@ -9,7 +9,8 @@ import {
   getPlayers,
   getSchedule,
 } from "./sleeper";
-import { FORMULA_KEY, computeTradeValues, type ValueInput } from "./tradeValue";
+import { FORMULA_KEY, MARKET_WEIGHT, computeTradeValues, fromShare, type ValueInput } from "./tradeValue";
+import { getMarketValues, type MarketValue } from "./market";
 import type { Player, PlayerValue, Position, Scoring, ValueBoard, WeekLine } from "./types";
 
 /** How many players per position appear on the trade value chart. */
@@ -89,12 +90,31 @@ function buildInputs(
 
 export function getValueBoard(scoring: Scoring): Promise<ValueBoard> {
   return getNflState().then((state) =>
-    memo(`board:${state.season}:${state.week}:${scoring}:${FORMULA_KEY}`, 2 * 60_000, () => computeBoard(scoring)),
+    memo(`board:${state.season}:${state.week}:${scoring}:${FORMULA_KEY}:m`, 2 * 60_000, () => computeBoard(scoring)),
   );
 }
 
+/**
+ * Blend model shares with market shares (see MARKET_WEIGHT) and rescale so the
+ * best player is 100. Players the market doesn't list are worth ~0 there.
+ */
+function blendWithMarket(
+  results: ReturnType<typeof computeTradeValues>,
+  market: Map<string, MarketValue>,
+  data: SeasonData,
+): ReturnType<typeof computeTradeValues> {
+  if (!market.size || MARKET_WEIGHT <= 0) return results;
+  const blended = results.map((r) => {
+    const pos = data.players[r.id].position;
+    const share = pos === "K" || pos === "DST" ? r.share * (1 - MARKET_WEIGHT * 0.5) : (1 - MARKET_WEIGHT) * r.share + MARKET_WEIGHT * (market.get(r.id)?.share ?? 0);
+    return { r, share };
+  });
+  const top = Math.max(1e-9, ...blended.map((b) => b.share));
+  return blended.map(({ r, share }) => ({ ...r, ...fromShare(share / top), share: share / top }));
+}
+
 async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
-  const data = await getSeasonData();
+  const [data, market] = await Promise.all([getSeasonData(), getMarketValues(scoring)]);
   const { week } = data;
 
   // Pool = anyone who has played or is projected to play this season.
@@ -107,7 +127,7 @@ async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
   let latest: ReturnType<typeof computeTradeValues> = [];
   for (let w = 1; w <= week; w++) {
     const isLatest = w === week;
-    const results = computeTradeValues(buildInputs(data, ids, scoring, w, isLatest), w);
+    const results = blendWithMarket(computeTradeValues(buildInputs(data, ids, scoring, w, isLatest), w), market, data);
     for (const r of results) {
       if (!history.has(r.id)) history.set(r.id, Array(week).fill(null));
       history.get(r.id)![w - 1] = r.value;
@@ -125,10 +145,10 @@ async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
     byPos.get(pos)!.push(r);
   }
   const kept = [...byPos.entries()].flatMap(([pos, list]) =>
-    list.sort((a, b) => a.posRank - b.posRank).slice(0, MAX_LISTED[pos]),
+    list.sort((a, b) => b.share - a.share).slice(0, MAX_LISTED[pos]),
   );
 
-  kept.sort((a, b) => b.value - a.value || a.posRank - b.posRank);
+  kept.sort((a, b) => b.share - a.share || a.posRank - b.posRank);
   // Displayed positional rank follows final value (incl. injury discount).
   const posCounter = new Map<Position, number>();
   const displayPosRank = new Map<string, number>();
@@ -152,6 +172,7 @@ async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
       injuryStatus: p.injuryStatus,
       value: r.value,
       power: r.power,
+      marketRank: market.get(r.id)?.rank ?? null,
       change: prev === null ? null : r.value - prev,
       overallRank: i + 1,
       posRank: displayPosRank.get(r.id)!,

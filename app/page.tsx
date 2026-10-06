@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Bot, Flame, Radio, TrendingDown, TrendingUp, Trophy, Users } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Bot, Flame, Radio, TrendingDown, Repeat, TrendingUp, Users } from "lucide-react";
 import { ChangePill, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { Sparkline } from "@/components/Charts";
 import { getLiveWeek } from "@/lib/live";
@@ -147,9 +147,9 @@ export default async function Home() {
       <section className="grid animate-rise grid-cols-2 gap-3 [animation-delay:260ms] lg:grid-cols-4">
         {[
           { href: "/trade", icon: ArrowLeftRight, title: "Trade Analyzer", text: "Get a verdict on any deal" },
+          { href: "/trade-finder", icon: Repeat, title: "Trade Finder", text: "Fair trades from your roster" },
           { href: "/assistant", icon: Bot, title: "AI Assistant", text: "Ask Claude about trades" },
-          { href: "/team-of-the-week", icon: Trophy, title: "Team of the Week", text: "The best possible lineup" },
-          { href: "/my-team", icon: Users, title: "My Team", text: "Import from Sleeper" },
+          { href: "/my-team", icon: Users, title: "My Team", text: "Sleeper, ESPN, photo or paste" },
         ].map((f) => (
           <Link key={f.href} href={f.href} className="card group p-4 transition hover:-translate-y-0.5 hover:border-rocket/40">
             <f.icon className="size-6 text-rocket transition group-hover:scale-110" />

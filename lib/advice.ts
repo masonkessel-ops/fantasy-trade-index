@@ -2,6 +2,7 @@ import "server-only";
 import { REGULAR_SEASON_WEEKS, getNflState, getScores, getWeekProjections, getWeekStats } from "./sleeper";
 import { bestLineup } from "./teamAnalysis";
 import { evaluateTrade } from "./tradeAnalysis";
+import { MAX_EDGE, MAX_SHOP_DISCOUNT } from "./tradeFinder";
 import { getValueBoard } from "./values";
 import type { PlayerValue, Position, Scoring } from "./types";
 
@@ -112,8 +113,8 @@ function findTrades(
       for (const give of combos(gives, gSize)) {
         for (const get of combos(gets, rSize)) {
           const t = evaluateTrade(give, get);
-          if (t.verdict === "lose") continue;
-          if (t.balance > 0.15 && t.diff > 2) continue; // too lopsided for them to accept
+          // Same fairness band as the Trade Finder: a deal the other team would actually take.
+          if (t.balance < -MAX_SHOP_DISCOUNT || t.balance > MAX_EDGE) continue;
           const giveIds = new Set(give.map((p) => p.id));
           const getIds = new Set(get.map((p) => p.id));
           const myGain = starterValue([...mine.filter((p) => !giveIds.has(p.id)), ...get], rosterPositions) - baseMe;

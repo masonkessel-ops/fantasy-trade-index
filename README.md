@@ -50,7 +50,11 @@ Everything lives in **[`lib/tradeValue.ts`](lib/tradeValue.ts)**, with the tunab
 
 Production is measured as **points over replacement**, which is what makes an RB1 worth more than a QB1 who scores more raw points. Save the file and the whole site updates (the cache key includes the formula settings).
 
-**Value vs. trade weight:** the displayed 1–100 value is compressed (`DISPLAY_CURVE`): good starters are 80+, the top ~150 are about 60+, and ties are common. Trades are judged on **trade weight** = value^`TRADE_CURVE` (3.3), so stars cost a premium. A 100 takes about 80 + 80 + 60, and 70 + 30 is nowhere close.
+**Market blend:** each value is `MARKET_WEIGHT` (60%) real trade-market price and 40% the stats model above. Market prices come from [FantasyCalc](https://www.fantasycalc.com/) (redraft, 12 teams, 1 QB, matching PPR/half/standard), which are built from thousands of real fantasy trades; see [`lib/market.ts`](lib/market.ts). If FantasyCalc is unreachable, the site falls back to the stats model alone.
+
+**Value vs. trade weight:** the displayed 1–100 value is compressed (`DISPLAY_CURVE`): good starters are 80+, the top ~150 are about 60+, and ties are common. Trades are judged on **trade weight** ("power"), each player's linear share of the top player's blended price, so stars cost what the market says they cost. A 100 takes about two 90s or three 85s, 80 + 80 + 60 falls about 45% short, and 70 + 30 is nowhere close.
+
+**Trade Finder:** [`lib/tradeFinder.ts`](lib/tradeFinder.ts) powers the `/trade-finder` page ("Trade away" and "Trade for"). Ideas must be fair (`MAX_EDGE`, `MAX_SHOP_DISCOUNT`, `MAX_OVERPAY`), can't leave one of your starting slots empty, and with an imported league must not gut the other team's lineup (`MAX_PARTNER_LOSS`). Cards say when you'd need to drop someone.
 
 **Risk vs reward:** [`lib/risk.ts`](lib/risk.ts) rates each player's risk (injury, age, boom/bust weeks, small sample, falling value). Every trade shows the value edge next to the risk you take on or shed, and the trade finder ranks ideas with risk included.
 

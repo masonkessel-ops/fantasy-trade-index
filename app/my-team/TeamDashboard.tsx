@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import clsx from "clsx";
-import { AlertTriangle, Crown, Loader2, RefreshCw, ShieldAlert, Trash2, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowRight, Crown, Loader2, RefreshCw, Repeat, ShieldAlert, Trash2, TrendingUp } from "lucide-react";
 import { CountUp } from "@/components/CountUp";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
@@ -17,7 +17,6 @@ import { SCORINGS, type PlayerValue, type Position, type Scoring } from "@/lib/t
 import { Avatar } from "./TeamSetup";
 import { LeagueError, refetchLeague, teamFromLeague } from "./leagueClient";
 import { GamePlan } from "./GamePlan";
-import { TradeFinder, type FinderMode } from "./TradeFinder";
 import { PlayerSheet, type PlayerWeek } from "./PlayerSheet";
 
 const PROVIDER_LABEL: Record<string, string> = { sleeper: "Sleeper", espn: "ESPN", yahoo: "Yahoo" };
@@ -27,20 +26,16 @@ export function TeamDashboard({
   players,
   scoring,
   onChange,
-  finderPreset,
 }: {
   team: SavedTeam;
   players: PlayerValue[];
   scoring: Scoring;
   onChange: (t: SavedTeam | null) => void;
-  /** open the trade finder pre-filled (from a player card or a player page link) */
-  finderPreset?: { mode: FinderMode; ids: string[] } | null;
 }) {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
-  const [preset, setPreset] = useState<{ mode: FinderMode; ids: string[]; nonce: number } | null>(finderPreset ? { ...finderPreset, nonce: 1 } : null);
 
   // This week's points for everyone on the roster (actual once games start, projected before).
   const idsKey = team.playerIds.join(",");
@@ -62,14 +57,9 @@ export function TeamDashboard({
     return w ? (w.actual ?? w.projected ?? 0) : 0;
   };
 
-  useEffect(() => {
-    if (finderPreset) document.getElementById("trade-finder")?.scrollIntoView({ behavior: "smooth" });
-  }, [finderPreset]);
-
   function tradeAway(id: string) {
     setSheetId(null);
-    setPreset({ mode: "away", ids: [id], nonce: Date.now() });
-    setTimeout(() => document.getElementById("trade-finder")?.scrollIntoView({ behavior: "smooth" }), 50);
+    router.push(`/trade-finder?away=${id}`);
   }
   const board = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
@@ -242,14 +232,19 @@ export function TeamDashboard({
 
       <GamePlan team={team} players={players} scoring={scoring} />
 
-      <TradeFinder
-        key={preset?.nonce ?? 0}
-        team={team}
-        players={players}
-        initialMode={preset?.mode}
-        initialAway={preset?.mode === "away" ? preset.ids : []}
-        initialWant={preset?.mode === "for" ? preset.ids : []}
-      />
+      <Link
+        href="/trade-finder"
+        className="card group flex items-center gap-4 p-5 transition hover:border-rocket/50"
+      >
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rocket to-flame text-bg">
+          <Repeat className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-xl font-bold uppercase tracking-wide">Trade finder</span>
+          <span className="block text-xs text-muted">Pick who to trade away or type who you want. Fair, market-priced trades that keep your lineup full.</span>
+        </span>
+        <ArrowRight className="size-5 shrink-0 text-rocket transition group-hover:translate-x-0.5" />
+      </Link>
 
       <PlayerSheet
         player={sheetId ? (board.get(sheetId) ?? null) : null}

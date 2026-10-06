@@ -9,7 +9,6 @@ import { CountUp } from "@/components/CountUp";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { useMyTeam } from "@/lib/myTeam";
-import { TradeFinder } from "../my-team/TradeFinder";
 import { edgeLabel, evaluateTrade, suggestBalancers, type TradeResult } from "@/lib/tradeAnalysis";
 import { tradeRiskReward } from "@/lib/risk";
 import { RiskRewardPanel, RiskTag } from "@/components/RiskReward";
@@ -96,7 +95,7 @@ export function TradeAnalyzer({
           subtitle={team ? `From ${team.name}` : "Players you send away"}
           accent="var(--color-rocket)"
           players={giveP}
-          adjusted={result.rawGive}
+          adjusted={Math.round(result.adjGive)}
           searchPool={players}
           quickPicks={myRoster}
           exclude={inTrade}
@@ -114,7 +113,7 @@ export function TradeAnalyzer({
           subtitle={partnerTeam ? `From ${partnerTeam.teamName}` : "Players you receive"}
           accent="var(--color-volt)"
           players={getP}
-          adjusted={result.rawGet}
+          adjusted={Math.round(result.adjGet)}
           searchPool={players}
           quickPicks={partnerRoster}
           exclude={inTrade}
@@ -195,18 +194,14 @@ export function TradeAnalyzer({
         )}
       </div>
 
-      {team ? (
-        <TradeFinder team={team} players={players} />
-      ) : (
-        <div className="card flex flex-col gap-2 p-5 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            <b className="text-ink">Trade finder:</b> add your team to type in who you want (or who you&apos;d trade away) and get fair trades from your roster.
-          </span>
-          <Link href="/my-team" className="shrink-0 font-semibold text-rocket hover:underline">
-            Add your team →
-          </Link>
-        </div>
-      )}
+      <div className="card flex flex-col gap-2 p-5 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          <b className="text-ink">Not sure what to offer?</b> The Trade Finder builds fair trades from your roster: pick who to trade away, or type who you want.
+        </span>
+        <Link href="/trade-finder" className="shrink-0 font-semibold text-rocket hover:underline">
+          Open Trade Finder →
+        </Link>
+      </div>
 
       {/* Mobile sticky verdict */}
       <AnimatePresence>
@@ -265,7 +260,9 @@ function SidePanel({
           <p className="text-xs text-muted">{subtitle}</p>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint">Total value</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint" title="What the trade market pays for this side. Stars count for much more than their 1–100 value suggests, and extra players count for a little less.">
+            Trade weight
+          </div>
           <CountUp value={adjusted} className="font-display text-3xl font-bold tabular" />
         </div>
       </div>
@@ -307,6 +304,11 @@ function SidePanel({
                   <PosBadge pos={p.position} /> {p.team} · {p.ppg} ppg
                 </span>
               </Link>
+              <span className="hidden text-right text-[10px] leading-tight text-faint sm:block" title="Trade weight: this player's market price as a share of the top player's">
+                wt
+                <br />
+                <b className="text-xs text-muted tabular">{Math.round(p.power)}</b>
+              </span>
               <ValueBadge value={p.value} size="sm" />
               <button onClick={() => onRemove(p.id)} className="rounded-lg p-1 text-faint transition hover:text-down" aria-label={`Remove ${p.name}`}>
                 <X className="size-4" />
@@ -369,10 +371,10 @@ function VerdictCard({ result, rr }: { result: TradeResult; rr: ReturnType<typeo
           <Meter balance={result.balance} active={result.verdict !== "empty"} />
           <div className="mt-3 flex justify-between text-xs text-muted">
             <span>
-              You give <b className="text-ink">{result.rawGive}</b> <span className="text-faint">value</span>
+              You give <b className="text-ink">{Math.round(result.adjGive)}</b> <span className="text-faint">trade weight</span>
             </span>
             <span>
-              You get <b className="text-ink">{result.rawGet}</b> <span className="text-faint">value</span>
+              You get <b className="text-ink">{Math.round(result.adjGet)}</b> <span className="text-faint">trade weight</span>
             </span>
           </div>
         </div>

@@ -40,14 +40,12 @@ export function MyTeam({
   yahooStatus,
   googleStatus = null,
   yahooDetail = null,
-  finderPreset = null,
 }: {
   players: PlayerValue[];
   scoring: Scoring;
   yahooStatus: string | null;
   googleStatus?: string | null;
   yahooDetail?: string | null;
-  finderPreset?: { mode: "away" | "for"; ids: string[] } | null;
 }) {
   const [team, setTeam, hydrated] = useMyTeam();
   const [notice, setNotice] = useState(googleStatus ? GOOGLE_MESSAGES[googleStatus] : yahooStatus ? YAHOO_MESSAGES[yahooStatus] : undefined);
@@ -101,7 +99,7 @@ export function MyTeam({
     <>
       {banner}
       <SaveCallout />
-      <TeamDashboard team={team} players={players} scoring={scoring} onChange={setTeam} finderPreset={finderPreset} />
+      <TeamDashboard team={team} players={players} scoring={scoring} onChange={setTeam} />
     </>
   );
 }

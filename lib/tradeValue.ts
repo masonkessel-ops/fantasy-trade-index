@@ -28,7 +28,8 @@
  *  3. INJURY multiplier on top (Out = 0.65×, IR = 0.4×, …), and a discount
  *     for streamable positions (K, DST).
  *
- *  4. The best player is 100. Displayed values use a compressed scale
+ *  4. Blended with real trade-market values (MARKET_WEIGHT), then the best
+ *     player is 100. Displayed values use a compressed scale
  *     (DISPLAY_CURVE) so good players sit in the 70s–90s and ties are common.
  *     Each player also gets a linear "trade power" (0–100, proportional to
  *     production) that the Trade Analyzer uses, so a 100 is never "fair" for
@@ -144,17 +145,18 @@ export function byeScore(byeWeek: number | null, currentWeek: number): number {
 export const DISPLAY_CURVE = 0.17;
 
 /**
- * Trade weight ("power") = 100 × (value / 100)^TRADE_CURVE. Stars cost a
- * premium: with 3.3 a 100 is worth about an 80 + 80 + 60 package (after the
- * package discount in lib/tradeAnalysis.ts), while 70 + 30 is nowhere close
- * and two 90s beat a 100. Trade verdicts, the trade finder and position
- * grades all use this.
+ * How much of each player's value comes from the real trade market
+ * (FantasyCalc, computed from actual fantasy trades; see lib/market.ts) vs.
+ * this model's live stats. 0 = stats only, 1 = market only. The market keeps
+ * trades realistic (it knows upside, roles and what people actually accept);
+ * the model reacts to this week's news first. Kickers and defenses always use
+ * the model because the market doesn't price them.
  */
-export const TRADE_CURVE = 3.3;
+export const MARKET_WEIGHT = 0.6;
 
 /** Changes whenever a knob above changes, so cached values refresh immediately. */
 export const FORMULA_KEY = JSON.stringify([
-  WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, DISPLAY_CURVE, TRADE_CURVE,
+  WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, DISPLAY_CURVE, MARKET_WEIGHT,
   STREAMABLE_DISCOUNT, DEPTH_CREDIT,
   byeScore.toString(),
 ]);
@@ -182,8 +184,10 @@ export interface ValueResult {
   id: string;
   /** displayed 1–100 value (compressed) */
   value: number;
-  /** trade weight 0–100 (value^TRADE_CURVE): stars cost a premium in trades */
+  /** trade weight 0–100: share of the best player's worth (linear, like market trade value) */
   power: number;
+  /** model score relative to the best player (0–1), before any market blend */
+  share: number;
   posRank: number;
   /** each factor's 0–1 score, plus injury multiplier, for the breakdown UI */
   breakdown: Record<keyof typeof WEIGHTS | "injury", number>;
@@ -294,18 +298,22 @@ export function computeTradeValues(inputs: ValueInput[], currentWeek: number): V
   return raw.map((r) => ({
     id: r.id,
     posRank: r.rank,
-    ...withPower(Math.max(1, Math.round(100 * Math.pow(r.score / top, DISPLAY_CURVE)))),
+    ...fromShare(r.score / top),
+    share: r.score / top,
     breakdown: r.scores,
   }));
 }
 
-/** Trade weight for a displayed value (see TRADE_CURVE). */
-export function tradePower(value: number) {
-  return Math.round(1000 * Math.pow(value / 100, TRADE_CURVE)) / 10;
-}
-
-function withPower(value: number) {
-  return { value, power: tradePower(value) };
+/**
+ * Turn a 0–1 share of the best player's worth into the displayed 1–100 value
+ * (compressed, see DISPLAY_CURVE) and the linear trade weight ("power") that
+ * trade fairness uses. Power is linear because market trade values are: if a
+ * player is worth 45% of the best one, two of him (minus the package discount)
+ * get you close.
+ */
+export function fromShare(share: number) {
+  const s = Math.max(0, Math.min(1, share));
+  return { value: Math.max(1, Math.round(100 * Math.pow(s, DISPLAY_CURVE))), power: Math.round(1000 * s) / 10 };
 }
 
 /** Friendly tier label for a value. */

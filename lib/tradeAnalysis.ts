@@ -1,10 +1,11 @@
 /**
  * Trade evaluation.
  *
- * Trades are judged on each player's trade weight ("power" = value^3.3, see
- * TRADE_CURVE in lib/tradeValue.ts), not the raw 1–100 value, because stars
- * cost a premium: a 100 takes roughly 80 + 80 + 60, and 70 + 30 is nowhere
- * close. On top of that, each extra player on a side counts for a little less
+ * Trades are judged on each player's trade weight ("power"): his share of the
+ * best player's worth, blended with real trade-market values (lib/market.ts).
+ * That scale is linear like the market's, so stars cost what people actually
+ * pay: Gibbs (100) takes roughly two top-25 players plus a top-50 player.
+ * Each extra player on a side also counts for a little less
  * (CONSOLIDATION_WEIGHTS), because roster spots and starting slots are limited.
  */
 import type { PlayerValue } from "./types";
@@ -13,7 +14,7 @@ import type { PlayerValue } from "./types";
 export const CONSOLIDATION_WEIGHTS = [1, 0.85, 0.7, 0.6, 0.5];
 
 /** A trade is "fair" when sides are within this share of the bigger side's power… */
-export const FAIR_PERCENT = 0.1;
+export const FAIR_PERCENT = 0.12;
 /** …or within this many power points (keeps low-value swaps from flip-flopping). */
 export const FAIR_ABSOLUTE = 2;
 

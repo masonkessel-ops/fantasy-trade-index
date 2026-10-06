@@ -62,8 +62,8 @@ export function TradeIdeaCard({
           <span className={clsx("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold", v.cls)}>{v.label}</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Side label="You give" players={giveP} total={r.rawGive} color="text-rocket" />
-          <Side label="You get" players={getP} total={r.rawGet} color="text-volt" />
+          <Side label="You give" players={giveP} total={Math.round(r.adjGive)} color="text-rocket" />
+          <Side label="You get" players={getP} total={Math.round(r.adjGet)} color="text-volt" />
         </div>
         {rr && <RiskRewardPill rr={rr} className="mt-3" />}
         {note && <div className="mt-2 text-xs leading-relaxed text-muted">{note}</div>}
@@ -81,7 +81,9 @@ function Side({ label, players, total, color }: { label: string; players: Player
     <div className="min-w-0">
       <div className="mb-1.5 flex items-baseline justify-between">
         <span className={clsx("text-[10px] font-bold uppercase tracking-wider", color)}>{label}</span>
-        <span className="font-display text-base font-bold tabular">{total}</span>
+        <span className="font-display text-base font-bold tabular" title="Trade weight: what the market pays for this side (stars count for more than their 1–100 value)">
+          {total} <span className="font-sans text-[9px] font-semibold uppercase text-faint">wt</span>
+        </span>
       </div>
       <ul className="space-y-1.5">
         {players.map((p) => (

@@ -18,11 +18,11 @@ export function PlayerTradeButtons({ id, name }: { id: string; name: string }) {
       </Link>
     );
   return onMyTeam ? (
-    <Link href={`/my-team?away=${id}#trade-finder`} className={cls}>
+    <Link href={`/trade-finder?away=${id}`} className={cls}>
       <ArrowUpFromLine className="size-4" /> Trade away: see what you can get
     </Link>
   ) : (
-    <Link href={`/my-team?want=${id}#trade-finder`} className={cls}>
+    <Link href={`/trade-finder?want=${id}`} className={cls}>
       <ArrowDownToLine className="size-4" /> What would it take to get him?
     </Link>
   );
