@@ -38,13 +38,13 @@ export function ScoringToggle({ scoring, compact = false }: { scoring: Scoring; 
             }}
             className={clsx(
               "relative flex-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-              active ? "text-bg" : "text-muted hover:text-ink",
+              active ? "text-white" : "text-muted hover:text-ink",
             )}
           >
             {active && (
               <motion.span
                 layoutId={compact ? "scoring-pill-m" : "scoring-pill"}
-                className="absolute inset-0 rounded-full bg-gradient-to-r from-rocket to-flame"
+                className="absolute inset-0 rounded-full bg-gradient-to-r from-brand to-brand-2"
                 transition={{ type: "spring", stiffness: 500, damping: 38 }}
               />
             )}

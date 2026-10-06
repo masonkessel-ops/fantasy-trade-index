@@ -300,6 +300,20 @@ export async function getLeagueDetail(leagueId: string): Promise<LeagueDetail | 
   };
 }
 
+/* --------------------------------------------------------------- trending */
+
+export interface Trending {
+  id: string;
+  /** how many Sleeper leagues added (or dropped) the player in the window */
+  count: number;
+}
+
+/** Most added / dropped players across all Sleeper leagues in the last `hours`. */
+export async function getTrending(kind: "add" | "drop", hours = 24, limit = 60): Promise<Trending[]> {
+  const raw = await sleeperJson<{ player_id: string; count: number }[]>(`/v1/players/nfl/trending/${kind}?lookback_hours=${hours}&limit=${limit}`, 15 * 60);
+  return (raw ?? []).map((r) => ({ id: r.player_id, count: r.count }));
+}
+
 /* ----------------------------------------------------------------- scores */
 
 export interface GameScore {

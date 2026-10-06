@@ -1,17 +1,18 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Flame, MessagesSquare, Radio, TrendingDown, Repeat, TrendingUp, Users } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Flame, ListOrdered, MessagesSquare, Radio, Repeat, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { ChangePill, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { Sparkline } from "@/components/Charts";
 import { getLiveWeek } from "@/lib/live";
 import { getScoring } from "@/lib/prefs";
 import { getValueBoard } from "@/lib/values";
+import { getWeeklyRankings } from "@/lib/weekly";
 import { POS_COLOR } from "@/lib/ui";
 import type { PlayerValue } from "@/lib/types";
 import { PlayerRowLink } from "./live/TopScorers";
 
 export default async function Home() {
   const scoring = await getScoring();
-  const [board, live] = await Promise.all([getValueBoard(scoring), getLiveWeek(scoring)]);
+  const [board, live, weekly] = await Promise.all([getValueBoard(scoring), getLiveWeek(scoring), getWeeklyRankings(scoring)]);
   const top = board.players.slice(0, 8);
   const movers = board.players.filter((p) => p.change !== null && p.value >= 55);
   const risers = [...movers].sort((a, b) => b.change! - a.change!).slice(0, 5);
@@ -52,19 +53,45 @@ export default async function Home() {
           Win every <span className="text-gradient">trade.</span>
         </h1>
         <p className="relative mt-4 max-w-lg text-sm text-muted sm:text-base">
-          Live 1–100 trade values for every fantasy player, an instant trade analyzer, and an AI assistant that knows your roster.
+          Live 1–100 trade values priced on the real trade market, fair trades built from your roster, and a lineup that starts whoever is projected to score the most.
         </p>
         <div className="relative mt-6 flex flex-wrap gap-2">
           <Link
-            href="/values"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rocket to-flame px-5 py-2.5 text-sm font-bold text-bg shadow-[0_8px_30px_-8px] shadow-rocket/60 transition hover:brightness-110"
+            href="/my-team"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_30px_-8px] shadow-rocket/60 transition hover:brightness-110"
           >
-            Trade values <ArrowRight className="size-4" />
+            Set up my team <ArrowRight className="size-4" />
           </Link>
           <Link href="/trade" className="inline-flex items-center gap-2 rounded-full border border-line-strong px-5 py-2.5 text-sm font-semibold transition hover:bg-white/5">
             Analyze a trade
           </Link>
+          <Link href="/values" className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-muted transition hover:text-ink">
+            Trade values
+          </Link>
         </div>
+        <p className="relative mt-5 text-xs text-faint">Free · no AI · import from Sleeper, ESPN, a Yahoo screenshot, or build by hand</p>
+      </section>
+
+      {/* Tools */}
+      <section className="grid animate-rise grid-cols-2 gap-3 [animation-delay:40ms] md:grid-cols-3">
+        {[
+          { href: "/my-team", icon: Users, title: "My Team", text: "Auto lineup, grades and trade ideas" },
+          { href: "/trade", icon: ArrowLeftRight, title: "Trade Analyzer", text: "Grade any deal in seconds" },
+          { href: "/trade-finder", icon: Repeat, title: "Trade Finder", text: "Fair trades for your roster" },
+          { href: "/rankings", icon: ListOrdered, title: "Weekly Rankings", text: "Who to start this week" },
+          { href: "/waivers", icon: TrendingUp, title: "Waiver Wire", text: "Who everyone is adding" },
+          { href: "/assistant", icon: MessagesSquare, title: "Trade Assistant", text: "Ask anything, instant answers" },
+        ].map((f) => (
+          <Link key={f.href} href={f.href} className="card group flex items-start gap-3 p-4 transition hover:-translate-y-0.5 hover:border-rocket/40">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand/25 to-brand-2/10 text-rocket transition group-hover:scale-105">
+              <f.icon className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-display text-lg font-bold uppercase leading-tight">{f.title}</span>
+              <span className="block text-xs text-muted">{f.text}</span>
+            </span>
+          </Link>
+        ))}
       </section>
 
       {/* Hot players */}
@@ -119,14 +146,41 @@ export default async function Home() {
         <section className="card animate-rise p-5 [animation-delay:140ms]">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-display text-xl font-bold uppercase tracking-wide">
-              <Radio className="size-5 text-down" /> Week {live.week} top scorers
+              {live.players.length === 0 ? (
+                <>
+                  <ListOrdered className="size-5 text-volt" /> Week {weekly.week} projected leaders
+                </>
+              ) : (
+                <>
+                  <Radio className="size-5 text-down" /> Week {live.week} top scorers
+                </>
+              )}
             </h2>
-            <Link href="/live" className="text-xs font-semibold text-rocket hover:underline">
-              Live tracker
+            <Link href={live.players.length === 0 ? "/rankings" : "/live"} className="text-xs font-semibold text-rocket hover:underline">
+              {live.players.length === 0 ? "All rankings" : "Live tracker"}
             </Link>
           </div>
           {live.players.length === 0 ? (
-            <p className="py-10 text-center text-sm text-faint">No games have kicked off yet this week.</p>
+            <ol className="divide-y divide-line">
+              {weekly.rows.slice(0, 8).map((r, i) => (
+                <li key={r.id}>
+                  <Link href={`/players/${r.id}`} className="flex items-center gap-3 py-2.5 transition hover:opacity-80">
+                    <span className="w-5 text-center font-display text-sm font-bold text-faint">{i + 1}</span>
+                    <PlayerAvatar id={r.id} position={r.position} team={r.team} name={r.name} size={34} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{r.name}</span>
+                      <span className="flex items-center gap-1.5 text-xs text-muted">
+                        <PosBadge pos={r.position} /> {r.team} <span className="text-faint">{r.opponent}</span>
+                      </span>
+                    </span>
+                    <span className="text-right leading-none">
+                      <span className="block font-display text-xl font-bold tabular">{r.proj}</span>
+                      <span className="text-[10px] text-faint">proj</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
           ) : (
             <ol className="divide-y divide-line">
               {live.players.slice(0, 8).map((p) => (
@@ -144,20 +198,6 @@ export default async function Home() {
         <MoverCard title="Fallers" icon={<TrendingDown className="size-5 text-down" />} players={fallers} delay={220} />
       </div>
 
-      <section className="grid animate-rise grid-cols-2 gap-3 [animation-delay:260ms] lg:grid-cols-4">
-        {[
-          { href: "/trade", icon: ArrowLeftRight, title: "Trade Analyzer", text: "Get a verdict on any deal" },
-          { href: "/trade-finder", icon: Repeat, title: "Trade Finder", text: "Fair trades from your roster" },
-          { href: "/assistant", icon: MessagesSquare, title: "Trade Assistant", text: "Ask anything, instant answers" },
-          { href: "/my-team", icon: Users, title: "My Team", text: "Sleeper, ESPN, photo or paste" },
-        ].map((f) => (
-          <Link key={f.href} href={f.href} className="card group p-4 transition hover:-translate-y-0.5 hover:border-rocket/40">
-            <f.icon className="size-6 text-rocket transition group-hover:scale-110" />
-            <div className="mt-3 font-display text-lg font-bold uppercase leading-tight">{f.title}</div>
-            <div className="text-xs text-muted">{f.text}</div>
-          </Link>
-        ))}
-      </section>
     </div>
   );
 }

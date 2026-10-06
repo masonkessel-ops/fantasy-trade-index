@@ -26,7 +26,7 @@ const TABS: { id: Mode; label: string; short: string }[] = [
 const inputCls =
   "h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface-2 px-4 text-sm outline-none transition placeholder:text-faint focus:border-rocket/50 focus:ring-4 focus:ring-rocket/10";
 const primaryBtn =
-  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rocket to-flame px-5 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-50";
+  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50";
 
 export function TeamSetup({
   players,
@@ -74,7 +74,7 @@ export function TeamSetup({
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={mode} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
             {mode === "sleeper" && <SleeperImport onFinish={finish} />}
-            {mode === "yahoo" && <YahooImport onFinish={finish} />}
+            {mode === "yahoo" && (YAHOO_SIGN_IN ? <YahooImport onFinish={finish} /> : <YahooByScreenshot onUsePhoto={() => setMode("photo")} />)}
             {mode === "espn" && <EspnImport onFinish={finish} />}
             {mode === "photo" && <PhotoImport players={players} scoring={scoring} onDone={onDone} />}
             {mode === "manual" && <ManualBuilder players={players} scoring={scoring} onDone={onDone} />}
@@ -124,7 +124,7 @@ function TeamPicker({
             )}
           >
             {t.rosterId === suggested && (
-              <span className="absolute -top-2 right-3 rounded-full bg-rocket px-2 py-0.5 text-[10px] font-bold text-bg">Looks like you</span>
+              <span className="absolute -top-2 right-3 rounded-full bg-rocket px-2 py-0.5 text-[10px] font-bold text-white">Looks like you</span>
             )}
             <Avatar src={t.avatar} label={t.teamName} />
             <span className="min-w-0">
@@ -267,6 +267,35 @@ function SleeperImport({ onFinish }: { onFinish: Finish }) {
 /* ----------------------------------------------------------------- Yahoo */
 
 type YahooLeague = { leagueKey: string; name: string; numTeams: number; season: string; logo: string | null };
+
+/**
+ * Direct Yahoo sign-in needs Yahoo to approve the app for Fantasy Sports data
+ * (sports.yahoo.com/developer/access). Until then, set nothing and Yahoo users import by screenshot;
+ * once approved, set NEXT_PUBLIC_YAHOO_SIGN_IN=1 in Vercel to turn sign-in back on.
+ */
+const YAHOO_SIGN_IN = process.env.NEXT_PUBLIC_YAHOO_SIGN_IN === "1";
+
+function YahooByScreenshot({ onUsePhoto }: { onUsePhoto: () => void }) {
+  return (
+    <div>
+      <h3 className="font-display text-2xl font-bold uppercase">Import from Yahoo</h3>
+      <ol className="mb-5 mt-3 space-y-2 text-sm text-muted">
+        <li>
+          <b className="text-ink">1.</b> Open your team in the Yahoo Fantasy app or on yahoo.com.
+        </li>
+        <li>
+          <b className="text-ink">2.</b> Take a screenshot that shows your whole roster.
+        </li>
+        <li>
+          <b className="text-ink">3.</b> Upload it here. We read the players right in your browser and set your best lineup automatically.
+        </li>
+      </ol>
+      <button onClick={onUsePhoto} className={primaryBtn}>
+        <Camera className="size-4" /> Upload a Yahoo screenshot
+      </button>
+    </div>
+  );
+}
 
 function YahooImport({ onFinish }: { onFinish: Finish }) {
   const [status, setStatus] = useState<{ configured: boolean; signedIn: boolean; name: string | null } | null>(null);
@@ -583,7 +612,7 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
         </span>
         {busy && progress && progress.pct > 0 ? (
           <span className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
-            <span className="block h-full rounded-full bg-gradient-to-r from-rocket to-flame transition-all" style={{ width: `${Math.round(progress.pct * 100)}%` }} />
+            <span className="block h-full rounded-full bg-gradient-to-r from-brand to-brand-2 transition-all" style={{ width: `${Math.round(progress.pct * 100)}%` }} />
           </span>
         ) : (
           <span className="text-xs text-faint">PNG, JPG or WEBP</span>
@@ -715,7 +744,7 @@ function ManualBuilder({
                 updatedAt: Date.now(),
               })
             }
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-rocket to-flame px-5 text-sm font-bold text-bg transition hover:brightness-110"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110"
           >
             Save team <ArrowRight className="size-4" />
           </button>

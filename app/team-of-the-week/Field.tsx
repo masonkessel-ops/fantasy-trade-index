@@ -67,7 +67,7 @@ function FieldView({
       }}
     >
       {/* end zones */}
-      <div className={clsx("absolute flex items-center justify-center bg-gradient-to-br from-rocket/90 to-flame/80", land ? "inset-y-0 left-0 w-[8%]" : "inset-x-0 bottom-0 h-[7%]")}>
+      <div className={clsx("absolute flex items-center justify-center bg-gradient-to-br from-brand/90 to-brand-2/80", land ? "inset-y-0 left-0 w-[8%]" : "inset-x-0 bottom-0 h-[7%]")}>
         <span className={clsx("font-display text-sm font-extrabold uppercase italic tracking-[0.3em] text-white/90 sm:text-lg", land && "-rotate-90 whitespace-nowrap")}>
           Trade
         </span>
@@ -141,7 +141,7 @@ function PlayerToken({ spot, mvp, compact }: { spot: Spot; mvp: boolean; compact
         {mvp && (
           <Crown className="absolute -top-4 left-1/2 size-4 -translate-x-1/2 fill-flame text-flame drop-shadow sm:-top-5 sm:size-5" />
         )}
-        <div className={clsx("rounded-full p-[3px]", mvp && "animate-pulse")} style={{ background: mvp ? "linear-gradient(135deg,#ffb21e,#ff5a2c)" : color }}>
+        <div className={clsx("rounded-full p-[3px]", mvp && "animate-pulse")} style={{ background: mvp ? "linear-gradient(135deg,#22d3ee,#7c3aed)" : color }}>
           <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={compact ? 42 : 56} />
         </div>
         <span

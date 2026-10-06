@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
 import { getScoring } from "@/lib/prefs";
@@ -22,7 +23,14 @@ export default async function ValuesPage({ searchParams }: PageProps<"/values">)
             Trade <span className="text-gradient">Values</span>
           </>
         }
-        subtitle="Every fantasy-relevant player on one 1–100 scale. Built from season PPG, recent form, rest-of-season projections, positional scarcity, age, injuries and bye weeks."
+        subtitle={
+          <>
+            Every fantasy-relevant player on one 1–100 scale, priced on the real trade market and live stats, grouped into tiers.{" "}
+            <Link href="/about" className="font-semibold text-rocket hover:underline">
+              How values work
+            </Link>
+          </>
+        }
       />
       <ValuesTable players={board.players} initialPos={initialPos} />
     </>

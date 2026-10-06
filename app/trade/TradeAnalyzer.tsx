@@ -9,7 +9,7 @@ import { CountUp } from "@/components/CountUp";
 import { PlayerSearch } from "@/components/PlayerSearch";
 import { InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { useMyTeam } from "@/lib/myTeam";
-import { edgeLabel, evaluateTrade, suggestBalancers, type TradeResult } from "@/lib/tradeAnalysis";
+import { edgeLabel, evaluateTrade, gradeTone, suggestBalancers, tradeGrade, type TradeResult } from "@/lib/tradeAnalysis";
 import { tradeRiskReward } from "@/lib/risk";
 import { RiskRewardPanel, RiskTag } from "@/components/RiskReward";
 import type { PlayerValue } from "@/lib/types";
@@ -356,8 +356,20 @@ function VerdictLabel({ result, small }: { result: TradeResult; small?: boolean 
         {s.label}
       </div>
       {result.verdict !== "empty" && (
-        <div className={clsx("text-muted", small ? "text-[11px]" : "mt-2 text-sm")}>
-          {edgeLabel(result)}
+        <div className={clsx("flex items-center gap-2 text-muted", small ? "text-[11px]" : "mt-2 text-sm")}>
+          {!small && (
+            <span
+              className="grid size-9 place-items-center rounded-xl font-display text-xl font-extrabold"
+              style={{ color: gradeTone(tradeGrade(result.balance)), background: `color-mix(in srgb, ${gradeTone(tradeGrade(result.balance))} 14%, transparent)` }}
+              title="Your grade for this trade"
+            >
+              {tradeGrade(result.balance)}
+            </span>
+          )}
+          <span>
+            {!small && "Your grade · "}
+            {edgeLabel(result)}
+          </span>
         </div>
       )}
     </div>

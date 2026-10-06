@@ -55,6 +55,26 @@ export function evaluateTrade(give: PlayerValue[], get: PlayerValue[]): TradeRes
   return { rawGive, rawGet, adjGive, adjGet, diff, balance, verdict };
 }
 
+/** Letter grade for your side of a trade, from your edge (-1 … 1). B+ = dead even. */
+export function tradeGrade(balance: number) {
+  const grades: [number, string][] = [
+    [0.2, "A+"],
+    [0.1, "A"],
+    [0.04, "A-"],
+    [-0.04, "B+"],
+    [-0.08, "B"],
+    [-0.12, "B-"],
+    [-0.18, "C"],
+    [-0.28, "D"],
+  ];
+  return grades.find(([min]) => balance >= min)?.[1] ?? "F";
+}
+
+/** Color for a grade: green for A's, violet for B's, amber for C, red for D/F. */
+export function gradeTone(grade: string) {
+  return grade.startsWith("A") ? "var(--color-up)" : grade.startsWith("B") ? "var(--color-rocket)" : grade === "C" ? "var(--color-flame)" : "var(--color-down)";
+}
+
 /** "+12% in your favor" style label for a trade's edge. */
 export function edgeLabel(r: TradeResult) {
   const pct = Math.round(Math.abs(r.balance) * 100);

@@ -69,7 +69,7 @@ export function TradeFinder({ team, players, initialAway = [], initialWant = [] 
           {selected.length > 0 && (
             <button
               onClick={scrollToResults}
-              className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rocket to-flame text-sm font-bold text-bg lg:hidden"
+              className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 text-sm font-bold text-white lg:hidden"
             >
               See {ideas.length} trade{ideas.length === 1 ? "" : "s"} <ArrowDown className="size-4" />
             </button>
@@ -187,7 +187,7 @@ function AwayPicker({ mine, selected, onChange }: { mine: PlayerValue[]; selecte
                         <span className="text-[11px] text-muted">{p.team ?? "FA"}</span>
                       </span>
                       <ValueBadge value={p.value} size="sm" />
-                      <span className={clsx("grid size-6 shrink-0 place-items-center rounded-full border", on ? "border-rocket bg-rocket text-bg" : "border-line-strong text-transparent")}>
+                      <span className={clsx("grid size-6 shrink-0 place-items-center rounded-full border", on ? "border-rocket bg-brand text-white" : "border-line-strong text-transparent")}>
                         <Check className="size-3.5" strokeWidth={3} />
                       </span>
                     </button>

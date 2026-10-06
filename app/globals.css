@@ -1,28 +1,33 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #05070c;
-  --color-surface: #0c1019;
-  --color-surface-2: #131926;
-  --color-surface-3: #1b2333;
+  /* Surfaces: near-black with a faint violet cast */
+  --color-bg: #07070c;
+  --color-surface: #0e0e17;
+  --color-surface-2: #15151f;
+  --color-surface-3: #1e1e2c;
   --color-line: rgb(255 255 255 / 0.07);
-  --color-line-strong: rgb(255 255 255 / 0.14);
-  --color-ink: #f3f6fb;
-  --color-muted: #8a94a8;
-  --color-faint: #566076;
+  --color-line-strong: rgb(255 255 255 / 0.13);
+  --color-ink: #f4f4f8;
+  --color-muted: #9494ab;
+  --color-faint: #5e5e76;
 
-  --color-rocket: #ff5a2c;
-  --color-flame: #ffb21e;
-  --color-volt: #2ee8ff;
-  --color-up: #1fe39a;
-  --color-down: #ff4d6d;
+  /* Brand: violet -> blue (buttons, active states); rocket = violet for text/icons/links */
+  --color-brand: #7c3aed;
+  --color-brand-2: #2563eb;
+  --color-rocket: #a78bfa;
+  --color-volt: #22d3ee;
+  /* Status */
+  --color-flame: #fbbf24;
+  --color-up: #34d399;
+  --color-down: #fb7185;
 
-  --color-qb: #ff4f8b;
-  --color-rb: #22e2a4;
-  --color-wr: #4fa9ff;
-  --color-te: #ffa53b;
-  --color-k: #b48cff;
-  --color-dst: #9ba8bc;
+  --color-qb: #f472b6;
+  --color-rb: #2dd4bf;
+  --color-wr: #60a5fa;
+  --color-te: #fb923c;
+  --color-k: #c084fc;
+  --color-dst: #94a3b8;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -61,8 +66,8 @@ html {
 
 body {
   background:
-    radial-gradient(1200px 600px at 85% -10%, rgb(255 90 44 / 0.10), transparent 60%),
-    radial-gradient(900px 500px at -10% 10%, rgb(46 232 255 / 0.06), transparent 60%),
+    radial-gradient(1200px 600px at 85% -10%, rgb(124 58 237 / 0.14), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, rgb(34 211 238 / 0.06), transparent 60%),
     var(--color-bg);
   background-attachment: fixed;
   color: var(--color-ink);
@@ -71,7 +76,7 @@ body {
 }
 
 ::selection {
-  background: rgb(255 90 44 / 0.35);
+  background: rgb(167 139 250 / 0.35);
 }
 
 @utility card {
@@ -81,7 +86,7 @@ body {
 }
 
 @utility text-gradient {
-  background: linear-gradient(100deg, var(--color-rocket), var(--color-flame));
+  background: linear-gradient(100deg, #c4b5fd, #67e8f9);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

@@ -8,10 +8,12 @@ import {
   ArrowLeftRight,
   BarChart3,
   Home,
+  ListOrdered,
   Menu,
   MessagesSquare,
   Radio,
   Repeat,
+  TrendingUp,
   Trophy,
   Users,
   X,
@@ -24,20 +26,42 @@ import { YahooAccount } from "./YahooAccount";
 import { AccountButton } from "./AccountButton";
 import type { Scoring } from "@/lib/types";
 
+const YAHOO_SIGN_IN = process.env.NEXT_PUBLIC_YAHOO_SIGN_IN === "1";
+
 type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
 
-export const NAV: NavItem[] = [
-  { href: "/", label: "Home", short: "Home", icon: Home },
-  { href: "/values", label: "Trade Values", short: "Values", icon: BarChart3 },
-  { href: "/trade", label: "Trade Analyzer", short: "Trade", icon: ArrowLeftRight },
-  { href: "/trade-finder", label: "Trade Finder", short: "Finder", icon: Repeat },
-  { href: "/assistant", label: "Trade Assistant", short: "Ask", icon: MessagesSquare },
-  { href: "/live", label: "Live Tracker", short: "Live", icon: Radio },
-  { href: "/team-of-the-week", label: "Team of the Week", short: "TOTW", icon: Trophy },
-  { href: "/my-team", label: "My Team", short: "My Team", icon: Users },
+/** Sidebar sections. */
+const GROUPS: { title: string | null; items: NavItem[] }[] = [
+  { title: null, items: [{ href: "/", label: "Home", short: "Home", icon: Home }] },
+  {
+    title: "Trade",
+    items: [
+      { href: "/values", label: "Trade Values", short: "Values", icon: BarChart3 },
+      { href: "/trade", label: "Trade Analyzer", short: "Trade", icon: ArrowLeftRight },
+      { href: "/trade-finder", label: "Trade Finder", short: "Finder", icon: Repeat },
+    ],
+  },
+  {
+    title: "Your team",
+    items: [
+      { href: "/my-team", label: "My Team", short: "Team", icon: Users },
+      { href: "/assistant", label: "Trade Assistant", short: "Ask", icon: MessagesSquare },
+    ],
+  },
+  {
+    title: "This week",
+    items: [
+      { href: "/rankings", label: "Weekly Rankings", short: "Ranks", icon: ListOrdered },
+      { href: "/waivers", label: "Waiver Wire", short: "Waivers", icon: TrendingUp },
+      { href: "/live", label: "Live Tracker", short: "Live", icon: Radio },
+      { href: "/team-of-the-week", label: "Team of the Week", short: "TOTW", icon: Trophy },
+    ],
+  },
 ];
+export const NAV: NavItem[] = GROUPS.flatMap((g) => g.items);
 
-const BOTTOM = ["/values", "/trade", "/trade-finder", "/assistant"];
+/** Phone tab bar (everything else is under More). */
+const BOTTOM = ["/my-team", "/values", "/trade", "/assistant"];
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -58,34 +82,39 @@ export function Nav({ scoring }: { scoring: Scoring }) {
           <LogoMark />
           <Wordmark />
         </Link>
-        <nav className="mt-8 flex flex-col gap-1">
-          {NAV.map((item) => {
-            const active = isActive(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                  active ? "text-ink" : "text-muted hover:bg-white/[0.03] hover:text-ink",
-                )}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="sidebar-active"
-                    className="absolute inset-0 rounded-xl border border-rocket/30 bg-gradient-to-r from-rocket/20 to-flame/5"
-                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                  />
-                )}
-                <item.icon className={clsx("relative size-[18px]", active && "text-rocket")} />
-                <span className="relative">{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="no-scrollbar -mx-1 mt-7 flex flex-col gap-4 overflow-y-auto px-1">
+          {GROUPS.map((g) => (
+            <div key={g.title ?? "top"} className="flex flex-col gap-0.5">
+              {g.title && <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-faint">{g.title}</p>}
+              {g.items.map((item) => {
+                const active = isActive(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={clsx(
+                      "relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                      active ? "text-ink" : "text-muted hover:bg-white/[0.03] hover:text-ink",
+                    )}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="sidebar-active"
+                        className="absolute inset-0 rounded-xl border border-rocket/30 bg-gradient-to-r from-brand/25 to-brand-2/5"
+                        transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                      />
+                    )}
+                    <item.icon className={clsx("relative size-[18px]", active && "text-rocket")} />
+                    <span className="relative">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
         <div className="mt-auto space-y-4 px-2">
           <AccountButton />
-          <YahooAccount />
+          {YAHOO_SIGN_IN && <YahooAccount />}
           <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-faint">Scoring</p>
             <ScoringToggle scoring={scoring} />
@@ -120,7 +149,7 @@ export function Nav({ scoring }: { scoring: Scoring }) {
                 {active && (
                   <motion.span
                     layoutId="tab-active"
-                    className="absolute top-0 h-0.5 w-10 rounded-full bg-gradient-to-r from-rocket to-flame"
+                    className="absolute top-0 h-0.5 w-10 rounded-full bg-gradient-to-r from-brand to-brand-2"
                   />
                 )}
                 <item.icon className={clsx("size-5", active && "text-rocket")} />
@@ -163,7 +192,7 @@ export function Nav({ scoring }: { scoring: Scoring }) {
               </div>
               <div className="mb-3 space-y-2">
                 <AccountButton />
-                <YahooAccount />
+                {YAHOO_SIGN_IN && <YahooAccount />}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {NAV.map((item) => (

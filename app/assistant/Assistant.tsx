@@ -197,7 +197,7 @@ export function Assistant({ players, scoring }: { players: PlayerValue[]; scorin
           />
           <button
             disabled={!input.trim() || busy}
-            className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-rocket to-flame px-4 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-40"
+            className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand to-brand-2 px-4 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-40"
           >
             Send <ArrowUp className="size-4" />
           </button>
@@ -231,7 +231,7 @@ function Message({
   if (m.role === "user") {
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-gradient-to-br from-rocket to-[#ff7a2c] px-4 py-2.5 text-sm font-medium text-bg">{m.content}</div>
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-gradient-to-br from-brand to-brand-2 px-4 py-2.5 text-sm font-medium text-white">{m.content}</div>
       </motion.div>
     );
   }
@@ -395,7 +395,7 @@ function PlayerCard({ p, mine }: { p: PlayerValue; mine: boolean }) {
       <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href={`/trade-finder?${mine ? "away" : "want"}=${p.id}`}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-gradient-to-r from-rocket to-flame px-4 text-xs font-bold text-bg transition hover:brightness-110"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-gradient-to-r from-brand to-brand-2 px-4 text-xs font-bold text-white transition hover:brightness-110"
         >
           {mine ? "Trade away" : "What would it take?"} <ArrowRight className="size-3.5" />
         </Link>
@@ -497,7 +497,7 @@ function LineupCard({ b, board, team, onApply }: { b: Extract<Block, { kind: "li
             disabled={done}
             className={clsx(
               "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-bold transition",
-              done ? "bg-up/10 text-up" : "bg-gradient-to-r from-rocket to-flame text-bg hover:brightness-110",
+              done ? "bg-up/10 text-up" : "bg-gradient-to-r from-brand to-brand-2 text-white hover:brightness-110",
             )}
           >
             {done ? <Check className="size-4" /> : <Sparkles className="size-4" />}

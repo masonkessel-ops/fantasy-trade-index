@@ -7,9 +7,13 @@ import clsx from "clsx";
 import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
 import { ChangePill, InjuryTag, PlayerAvatar, PosBadge, TeamLogo, ValueBadge } from "@/components/PlayerBits";
 import { Sparkline } from "@/components/Charts";
-import { POS_COLOR } from "@/lib/ui";
+import { useMyTeam } from "@/lib/myTeam";
+import { valueTier } from "@/lib/tradeValue";
+import { POS_COLOR, valueColor } from "@/lib/ui";
 import { TEAM_CODES } from "@/lib/teams";
 import { POSITIONS, type PlayerValue, type Position } from "@/lib/types";
+
+const TIER_RANGE: Record<string, string> = { Elite: "93–100", Star: "85–92", Starter: "76–84", Flex: "65–75", Depth: "under 65" };
 
 type SortKey = "value" | "change" | "ppg" | "recentPpg" | "rosPpg" | "age" | "name";
 
@@ -28,6 +32,8 @@ export function ValuesTable({ players, initialPos }: { players: PlayerValue[]; i
   const [team, setTeam] = useState("ALL");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "value", dir: "desc" });
   const q = useDeferredValue(query.trim().toLowerCase());
+  const [myTeam] = useMyTeam();
+  const mine = useMemo(() => new Set(myTeam?.playerIds ?? []), [myTeam]);
 
   const rows = useMemo(() => {
     const filtered = players.filter(
@@ -147,8 +153,18 @@ export function ValuesTable({ players, initialPos }: { players: PlayerValue[]; i
           <div className="px-4 py-16 text-center text-sm text-muted">No players match those filters.</div>
         ) : (
           <ul>
-            {rows.map((p, i) => (
+            {rows.map((p, i) => {
+              const tier = valueTier(p.value);
+              const showTier = sort.key === "value" && sort.dir === "desc" && (i === 0 || valueTier(rows[i - 1].value).label !== tier.label);
+              return (
               <li key={p.id} className="border-b border-line last:border-0">
+                {showTier && (
+                  <div className="flex items-center gap-2 border-b border-line bg-white/[0.02] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] sm:px-4" style={{ color: valueColor(p.value) }}>
+                    <span className="size-1.5 rounded-full" style={{ background: valueColor(p.value) }} />
+                    {tier.label}
+                    <span className="font-semibold text-faint">{TIER_RANGE[tier.label]}</span>
+                  </div>
+                )}
                 <Link
                   href={`/players/${p.id}`}
                   className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.025] sm:px-4"
@@ -163,6 +179,7 @@ export function ValuesTable({ players, initialPos }: { players: PlayerValue[]; i
                       <span className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-semibold group-hover:text-white">{p.name}</span>
                         <InjuryTag status={p.injuryStatus} />
+                        {mine.has(p.id) && <span className="rounded bg-rocket/15 px-1 py-px text-[9px] font-bold uppercase text-rocket">Mine</span>}
                       </span>
                       <span className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
                         <PosBadge pos={p.position} />
@@ -198,7 +215,8 @@ export function ValuesTable({ players, initialPos }: { players: PlayerValue[]; i
                   <span className="hidden w-10 justify-end text-sm text-muted tabular xl:flex">{p.age ?? "–"}</span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

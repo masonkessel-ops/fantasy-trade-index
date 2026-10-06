@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import clsx from "clsx";
 import { ArrowDownUp, ArrowRight } from "lucide-react";
 import { PlayerAvatar, PosBadge, ValueBadge } from "./PlayerBits";
-import { evaluateTrade } from "@/lib/tradeAnalysis";
+import { evaluateTrade, gradeTone, tradeGrade } from "@/lib/tradeAnalysis";
 import { tradeRiskReward } from "@/lib/risk";
 import { RiskRewardPill } from "./RiskReward";
 import type { PlayerValue } from "@/lib/types";
@@ -46,6 +46,7 @@ export function TradeIdeaCard({
   const rr = tradeRiskReward(giveP, getP);
   const href = `/trade?give=${give.join(",")}&get=${get.join(",")}${partnerRosterId ? `&partner=${partnerRosterId}` : ""}`;
   const v = VERDICT[r.verdict];
+  const grade = tradeGrade(r.balance);
   return (
     <motion.div
       initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -59,7 +60,16 @@ export function TradeIdeaCard({
             <div className="truncate font-display text-lg font-bold uppercase leading-tight">{title}</div>
             {subtitle && <div className="truncate text-xs text-muted">{subtitle}</div>}
           </div>
-          <span className={clsx("shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold", v.cls)}>{v.label}</span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            <span className={clsx("rounded-full px-2.5 py-0.5 text-[11px] font-bold", v.cls)}>{v.label}</span>
+            <span
+              className="grid size-7 place-items-center rounded-lg font-display text-sm font-extrabold"
+              style={{ color: gradeTone(grade), background: `color-mix(in srgb, ${gradeTone(grade)} 14%, transparent)` }}
+              title="Your grade for this trade"
+            >
+              {grade}
+            </span>
+          </span>
         </div>
         <Side label="You give" players={giveP} total={Math.round(r.adjGive)} color="text-rocket" />
         <div className="my-1.5 flex items-center gap-2 text-faint">
