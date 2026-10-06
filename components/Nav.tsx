@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeftRight,
   BarChart3,
+  Columns3,
   Home,
   ListOrdered,
   Menu,
@@ -39,6 +40,7 @@ const GROUPS: { title: string | null; items: NavItem[] }[] = [
       { href: "/values", label: "Trade Values", short: "Values", icon: BarChart3 },
       { href: "/trade", label: "Trade Analyzer", short: "Trade", icon: ArrowLeftRight },
       { href: "/trade-finder", label: "Trade Finder", short: "Finder", icon: Repeat },
+      { href: "/compare", label: "Compare Players", short: "Compare", icon: Columns3 },
     ],
   },
   {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Columns3 } from "lucide-react";
 import { ChangePill, InjuryTag, PlayerAvatar, PosBadge, TeamLogo, ValueBadge } from "@/components/PlayerBits";
 import { ValueTrendChart, WeeklyPointsChart } from "@/components/Charts";
 import { getScoring } from "@/lib/prefs";
@@ -110,8 +110,14 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
         </div>
 
         {value && (
-          <div className="relative mt-5">
+          <div className="relative mt-5 flex flex-wrap items-center gap-2">
             <PlayerTradeButtons id={player.id} name={player.name} />
+            <Link
+              href={`/compare?ids=${player.id}`}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-line-strong px-4 text-sm font-semibold transition hover:bg-white/5"
+            >
+              <Columns3 className="size-4" /> Compare
+            </Link>
           </div>
         )}
 
