@@ -2,7 +2,7 @@
 
 A fantasy football trade companion: live 1–100 trade values, a trade analyzer, a trade finder, an instant trade assistant (no AI), a live weekly tracker and a Team of the Week, all with a dark, mobile-friendly UI.
 
-Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**, using the free [Sleeper API](https://docs.sleeper.com) for players, stats, projections, scores and leagues, plus the optional [Anthropic API](https://docs.claude.com) for reading roster screenshots.
+Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**, using the free [Sleeper API](https://docs.sleeper.com) for players, stats, projections, scores and leagues, plus [FantasyCalc](https://www.fantasycalc.com/) market values and [Tesseract.js](https://github.com/naptha/tesseract.js) to read roster screenshots in the browser. No API keys or AI needed.
 
 ## Features
 
@@ -14,7 +14,7 @@ Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**
 | **Trade Assistant** (`/assistant`) | Ask about trades, values and lineups in plain English ("Walker for Puka?", "What can I get for McBride?", "Who should I start?"). It can also build trades ("make me a trade with Walker and Rice", "make me a trade for a QB"). Answers instantly from the site's own math, no AI |
 | **Live Tracker** (`/live`) | Refreshes every 60s: top scorers by position, booms and busts vs. projection, and a scoreboard with each game's top fantasy performers |
 | **Team of the Week** (`/team-of-the-week`) | The highest-scoring possible lineup (QB, 2 RB, 2 WR, TE, FLEX, K, DST) on a football-field graphic, with a week picker |
-| **My Team** (`/my-team`) | Starting lineup and bench with this week's points (tap a player for their card and a **Trade away** shortcut). Sign in with Google to save your team. Import from **Sleeper**, **Yahoo** (sign in), **ESPN** (league ID; private leagues via cookies), a **screenshot** of any fantasy app (read by Claude), **pasted** roster text, or build one by hand. Includes a **Trade finder**: pick players to trade away and see what you could get, or pick a player you want and see what to offer. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
+| **My Team** (`/my-team`) | Starting lineup and bench with this week's points (tap a player for their card and a **Trade away** shortcut). Sign in with Google to save your team. Import from **Sleeper**, **Yahoo** (sign in), **ESPN** (league ID; private leagues via cookies), a **screenshot** of any fantasy app (read in your browser, no AI), **pasted** roster text, or build one by hand. Includes a **Trade finder**: pick players to trade away and see what you could get, or pick a player you want and see what to offer. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
 
 PPR, Half-PPR and Standard scoring are supported everywhere (toggle in the sidebar or header). Importing a Sleeper league switches to that league's format.
 
@@ -30,7 +30,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Open `.env.local` and paste your Anthropic API key (from [console.anthropic.com](https://console.anthropic.com/)). The key is optional: it only powers photo roster import. Everything else works without it.
+Every setting in `.env.local` is optional (Yahoo sign-in, Google sign-in, saved teams). The site works without any of them.
 
 ```bash
 npm run dev
@@ -84,7 +84,7 @@ Setup (two free services):
 
 ## Importing from a photo or pasted text
 
-- **Photo** ([`app/api/roster/photo/route.ts`](app/api/roster/photo/route.ts)): upload a screenshot of your team page from any app. Claude reads the player names (structured output), and [`lib/rosterMatch.ts`](lib/rosterMatch.ts) matches them to our players, including abbreviations like "J. Gibbs". This needs `ANTHROPIC_API_KEY`, and it's limited to 10 uploads per hour per visitor.
+- **Photo** (`readScreenshot` in [`app/my-team/TeamSetup.tsx`](app/my-team/TeamSetup.tsx)): choose a screenshot of your team page from any app. The browser cleans it up (grayscale, flips dark mode, boosts contrast) and reads the text with [Tesseract.js](https://github.com/naptha/tesseract.js); the picture never leaves the device. The text then goes through the same matcher as pasted text, [`lib/rosterMatch.ts`](lib/rosterMatch.ts), which handles abbreviations like "J. Gibbs" and small misreadings like "Kenneth Waiker". No API key needed; the reader (a few MB) downloads from a CDN the first time.
 - **Paste** ([`app/api/roster/text/route.ts`](app/api/roster/text/route.ts)): copy your whole team page and paste it. Names are matched locally, with no AI, so it's free.
 
 ## Importing from Yahoo and ESPN
@@ -137,9 +137,7 @@ The assistant answers without AI: [`lib/bot/names.ts`](lib/bot/names.ts) finds t
    Then create an empty repo on GitHub and follow its "push an existing repository" instructions.
 
 2. Go to [vercel.com/new](https://vercel.com/new), sign in with GitHub, and **import** the repo. Vercel detects Next.js automatically, so you can keep the default settings.
-3. (Optional, only for photo roster import) open **Settings → Environment Variables** and add:
-   - `ANTHROPIC_API_KEY` = your key
-4. Click **Deploy**. If you added the key after the first deploy, redeploy (Deployments → ⋯ → Redeploy) so it takes effect.
+3. Click **Deploy**. No environment variables are required; the optional ones (Yahoo, Google sign-in, saved teams) are covered below. If you add one after the first deploy, redeploy (Deployments → ⋯ → Redeploy) so it takes effect.
 
 The free Hobby plan is plenty for this app. Every push to `main` redeploys automatically.
 

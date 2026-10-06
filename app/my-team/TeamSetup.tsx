@@ -465,28 +465,60 @@ function EspnImport({ onFinish }: { onFinish: Finish }) {
 
 /* ----------------------------------------------------------- Photo / Paste */
 
-/** Shrink big screenshots before upload (keeps requests small and fast). */
-async function toDataUrl(file: File): Promise<string> {
-  const raw = await new Promise<string>((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(new Error("Couldn't read that file."));
-    r.readAsDataURL(file);
-  });
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = () => reject(new Error("That file isn't an image."));
-    i.src = raw;
-  });
-  const MAX = 2000;
-  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-  if (scale === 1 && file.size < 3_500_000 && /image\/(png|jpeg|webp)/.test(file.type)) return raw;
-  const c = document.createElement("canvas");
-  c.width = Math.round(img.width * scale);
-  c.height = Math.round(img.height * scale);
-  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL("image/jpeg", 0.88);
+/**
+ * Read the text in a roster screenshot right in the browser (free, no AI, nothing uploaded):
+ * clean the image up for the reader, then run Tesseract on it.
+ */
+async function readScreenshot(file: File, onProgress: (p: { pct: number; label: string }) => void): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("That file isn't an image."));
+      i.src = url;
+    });
+    // Small screenshots read better enlarged; huge ones are capped to stay fast.
+    const scale = Math.min(2, Math.max(1, 1600 / img.width), 4000 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * scale);
+    c.height = Math.round(img.height * scale);
+    const ctx = c.getContext("2d", { willReadFrequently: true })!;
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    // Grayscale, flip dark-mode screenshots to dark-on-light, and boost contrast.
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    const px = data.data;
+    let sum = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const y = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      px[i] = y;
+      sum += y;
+    }
+    const dark = sum / (px.length / 4) < 128;
+    for (let i = 0; i < px.length; i += 4) {
+      let y = dark ? 255 - px[i] : px[i];
+      y = Math.max(0, Math.min(255, (y - 128) * 1.5 + 128));
+      px[i] = px[i + 1] = px[i + 2] = y;
+    }
+    ctx.putImageData(data, 0, 0);
+
+    onProgress({ pct: 0, label: "Getting the photo reader ready…" });
+    const { createWorker } = await import("tesseract.js");
+    const worker = await createWorker("eng", 1, {
+      logger: (m: { status: string; progress: number }) => {
+        if (m.status === "recognizing text") onProgress({ pct: m.progress, label: "Reading your roster…" });
+        else if (m.status.startsWith("loading")) onProgress({ pct: 0, label: "Getting the photo reader ready (first time takes a few seconds)…" });
+      },
+    });
+    try {
+      const { data: result } = await worker.recognize(c);
+      return result.text;
+    } finally {
+      await worker.terminate();
+    }
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 type RosterResult = { teamName?: string | null; matched: { id: string; name: string; starter?: boolean }[]; unmatched: string[] };
@@ -495,6 +527,7 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null);
   const [text, setText] = useState("");
   const [result, setResult] = useState<RosterResult | null>(null);
   const onBoard = new Set(players.map((p) => p.id));
@@ -517,12 +550,23 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
 
   async function onFile(file: File | undefined) {
     if (!file) return;
+    if (!file.type.startsWith("image/")) return setError("Choose a screenshot (PNG, JPG or WEBP).");
+    setBusy(true);
+    setError(null);
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(file);
+    });
     try {
-      const dataUrl = await toDataUrl(file);
-      setPreview(dataUrl);
-      await send("/api/roster/photo", { image: dataUrl });
+      const read = await readScreenshot(file, setProgress);
+      if (read.trim().length < 3) throw new Error("Couldn't read any text in that picture. Try a sharper screenshot of your roster.");
+      setProgress(null);
+      await send("/api/roster/text", { text: read });
     } catch (e) {
-      setError((e as Error).message);
+      setError((e as Error).message || "Couldn't read that picture.");
+      setBusy(false);
+    } finally {
+      setProgress(null);
     }
   }
 
@@ -562,7 +606,8 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
     <div>
       <h3 className="font-display text-2xl font-bold uppercase">Import from a photo</h3>
       <p className="mb-4 text-sm text-muted">
-        Take a screenshot of your team page in any fantasy app (Yahoo, ESPN, NFL.com…) and upload it. We&apos;ll read the players and build your team.
+        Take a screenshot of your team page in any fantasy app (Yahoo, ESPN, NFL.com…) and choose it here. Your browser reads the players itself: free, no AI, and the
+        picture never leaves your device.
       </p>
       <label
         onDragOver={(e) => e.preventDefault()}
@@ -584,13 +629,19 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
         <span className="text-sm font-semibold">
           {busy ? (
             <span className="inline-flex items-center gap-2">
-              <Loader2 className="size-4 animate-spin" /> Reading your roster…
+              <Loader2 className="size-4 animate-spin" /> {progress?.label ?? "Finding your players…"}
             </span>
           ) : (
             "Tap to choose a screenshot, or drop it here"
           )}
         </span>
-        <span className="text-xs text-faint">PNG, JPG or WEBP</span>
+        {busy && progress && progress.pct > 0 ? (
+          <span className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
+            <span className="block h-full rounded-full bg-gradient-to-r from-rocket to-flame transition-all" style={{ width: `${Math.round(progress.pct * 100)}%` }} />
+          </span>
+        ) : (
+          <span className="text-xs text-faint">PNG, JPG or WEBP</span>
+        )}
         <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
       </label>
 

@@ -1,6 +1,6 @@
 import "server-only";
 import { getMatcher } from "./leagueImport";
-import { normalizeName, normalizeTeam } from "./playerMatch";
+import { editDistance, normalizeName, normalizeTeam } from "./playerMatch";
 import { getPlayers } from "./sleeper";
 import type { Player, Position } from "./types";
 
@@ -112,6 +112,38 @@ export async function matchRosterText(text: string) {
           lineOf.set(pick.id, lineIdx);
         }
         break;
+      }
+    }
+  }
+  // Small misspellings, mostly from reading screenshots ("Kenneth Waiker"): the closest
+  // fantasy-relevant player, only when one name is clearly closest.
+  const relevant = players
+    .filter((p) => p.position !== "DST" && p.team && p.searchRank !== null && p.searchRank <= 800 && !found.has(p.id))
+    .map((p) => ({ p, full: normalizeName(p.name) }))
+    .filter((x) => x.full.includes(" ") && x.full.length >= 7);
+  for (const [lineIdx, line] of lines.entries()) {
+    const words = line.trim().split(" ");
+    for (let i = 0; i < words.length - 1; i++) {
+      for (const n of [2, 3]) {
+        if (i + n > words.length) continue;
+        const phrase = words.slice(i, i + n).join(" ");
+        if (phrase.length < 7) continue;
+        const max = phrase.length >= 12 ? 2 : 1;
+        const lastInitial = phrase.split(" ").at(-1)![0];
+        let best: { d: number; p: Player } | null = null;
+        let tie = false;
+        for (const k of relevant) {
+          if (found.has(k.p.id) || Math.abs(k.full.length - phrase.length) > max) continue;
+          if (k.full[0] !== phrase[0] && k.full.split(" ").at(-1)![0] !== lastInitial) continue;
+          const d = editDistance(phrase, k.full, max);
+          if (d > max) continue;
+          if (!best || d < best.d) [best, tie] = [{ d, p: k.p }, false];
+          else if (d === best.d && best.p.id !== k.p.id) tie = true;
+        }
+        if (best && !tie && best.d > 0) {
+          found.set(best.p.id, { id: best.p.id, name: best.p.name, position: best.p.position, team: best.p.team });
+          lineOf.set(best.p.id, lineIdx);
+        }
       }
     }
   }
