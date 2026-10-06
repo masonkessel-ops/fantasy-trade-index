@@ -521,7 +521,7 @@ async function readScreenshot(file: File, onProgress: (p: { pct: number; label: 
   }
 }
 
-type RosterResult = { teamName?: string | null; matched: { id: string; name: string; starter?: boolean }[]; unmatched: string[] };
+type RosterResult = { teamName?: string | null; matched: { id: string; name: string; starter?: boolean }[]; unmatched: string[]; slots?: string[] | null };
 
 function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; scoring: Scoring; onDone: (t: SavedTeam) => void }) {
   const [busy, setBusy] = useState(false);
@@ -572,7 +572,7 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
 
   if (result) {
     const ids = result.matched.map((m) => m.id).filter((id) => onBoard.has(id));
-    const knowsLineup = result.matched.some((m) => m.starter === false) && result.matched.some((m) => m.starter === true);
+    const knowsLineup = result.matched.filter((m) => m.starter === true).length >= 3;
     const starters = knowsLineup ? result.matched.filter((m) => m.starter && onBoard.has(m.id)).map((m) => m.id) : undefined;
     const offChart = result.matched.length - ids.length;
     return (
@@ -586,6 +586,7 @@ function PhotoImport({ players, scoring, onDone }: { players: PlayerValue[]; sco
           onDone={onDone}
           initialIds={ids}
           initialStarters={starters}
+          initialRosterPositions={result.slots ?? undefined}
           initialName={result.teamName ?? ""}
           title="Check your roster"
           subtitle={`We found ${result.matched.length} player${result.matched.length === 1 ? "" : "s"}${starters ? ` (${starters.length} starting)` : ""}. Remove any mistakes, add anyone we missed, then save.`}
@@ -672,6 +673,7 @@ function ManualBuilder({
   onDone,
   initialIds = [],
   initialStarters,
+  initialRosterPositions,
   initialName = "",
   title = "Build your roster",
   subtitle = "Search and add each player on your team.",
@@ -682,6 +684,8 @@ function ManualBuilder({
   onDone: (t: SavedTeam) => void;
   initialIds?: string[];
   initialStarters?: string[];
+  /** the league's lineup slots, when a screenshot/paste showed them */
+  initialRosterPositions?: string[];
   initialName?: string;
   title?: string;
   subtitle?: string;
@@ -760,7 +764,7 @@ function ManualBuilder({
                 avatar: null,
                 scoring,
                 playerIds: roster.map((p) => p.id),
-                rosterPositions: DEFAULT_ROSTER_POSITIONS,
+                rosterPositions: initialRosterPositions ?? DEFAULT_ROSTER_POSITIONS,
                 directory: {},
                 starters: initialStarters?.filter((id) => ids.includes(id)),
                 updatedAt: Date.now(),

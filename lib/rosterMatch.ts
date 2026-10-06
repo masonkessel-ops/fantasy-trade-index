@@ -70,54 +70,100 @@ function defenseByName(name: string, all: Player[]) {
   return d?.id ?? null;
 }
 
+/** Slot labels as fantasy apps print them (normalized) -> Sleeper-style roster slots. */
+const SLOT_LABELS: [RegExp, string][] = [
+  [/^(q w r t|q\/w\/r\/t|qwrt|sflex|superflex|super flex|op)$/, "SUPER_FLEX"],
+  [/^(w r t|w\/r\/t|wrt|flex|rb\/wr\/te|w r te)$/, "FLEX"],
+  [/^(w r|w\/r|wr\/rb|rb\/wr)$/, "WRRB_FLEX"],
+  [/^(w t|w\/t|wr\/te)$/, "REC_FLEX"],
+  [/^qb$/, "QB"],
+  [/^rb$/, "RB"],
+  [/^wr$/, "WR"],
+  [/^te$/, "TE"],
+  [/^(k|pk)$/, "K"],
+  [/^(def|dst|d st|d\/st|dist)$/, "DEF"],
+  [/^(bn|bench|be)$/, "BN"],
+  [/^(ir|ir\+|res|reserve)$/, "IR"],
+];
+const BENCH = new Set(["BN", "IR"]);
+const DEF_WORD = "(def|dst|d st|d\\/st|dist|defense)";
+
+/** The roster slot a line starts with ("WR J. Chase …" -> "WR"), if any. */
+function slotAt(line: string) {
+  const words = line.trim().split(" ");
+  for (const n of [3, 2, 1]) {
+    const head = words.slice(0, n).join(" ");
+    const hit = SLOT_LABELS.find(([re]) => re.test(head));
+    if (hit) return hit[1];
+  }
+  return null;
+}
+
+export interface RosterTextResult {
+  matched: MatchedPlayer[];
+  /** the league's roster slots in screen order (e.g. QB, WR, WR, WR, RB, RB, TE, FLEX, K, DEF, BN…), when the page shows them */
+  slots: string[] | null;
+}
+
 /**
- * Find players named anywhere in pasted text (e.g. a copied Yahoo/ESPN roster page).
- * Free and offline: no AI involved.
+ * Find players named anywhere in pasted or screenshot-read text (e.g. a Yahoo/ESPN
+ * roster page), plus who's starting and the league's lineup slots. Free and offline: no AI.
  */
-export async function matchRosterText(text: string) {
+export async function matchRosterText(text: string): Promise<RosterTextResult> {
   const players = Object.values(await getPlayers());
-  const lines = text.split(/\n/).map((l) => ` ${normalizeName(l)} `);
-  // Roster pages label each row with its slot; rows starting BN/IR are bench.
-  const SLOT_START = /^ (qb|rb|wr|te|flex|w r t|w\/r\/t|wrt|w r|w t|q w r t|sflex|op|k|def|d st|d\/st|dst|bn|bench|ir|res) /;
-  const hasSlots = lines.filter((l) => SLOT_START.test(l)).length >= 3;
-  const isBench = (line: string) => /^ (bn|bench|ir|res) /.test(line);
-  const lineOf = new Map<string, number>();
+  const cleaned = text
+    .replace(/\|/g, " ")
+    .replace(/\b([A-Z])\.(?=[A-Z][a-z])/g, "$1. "); // "J.Allen" -> "J. Allen"
+  const lines = cleaned.split(/\n/).map((l) => ` ${normalizeName(l)} `);
   const whole = ` ${lines.join(" ")} `;
   const found = new Map<string, MatchedPlayer>();
+  const lineOf = new Map<string, number>();
+  const add = (p: Player, line: number) => {
+    if (found.has(p.id)) return;
+    found.set(p.id, { id: p.id, name: p.name, position: p.position, team: p.team });
+    lineOf.set(p.id, line);
+  };
 
+  // 1. Full names.
   for (const p of players) {
     if (p.position === "DST") continue;
     const full = normalizeName(p.name);
-    if (full.split(" ").length >= 2 && whole.includes(` ${full} `)) {
-      found.set(p.id, { id: p.id, name: p.name, position: p.position, team: p.team });
-      lineOf.set(p.id, lines.findIndex((l) => l.includes(` ${full} `)));
-    }
+    if (full.split(" ").length >= 2 && whole.includes(` ${full} `)) add(p, lines.findIndex((l) => l.includes(` ${full} `)));
   }
-  // Abbreviated names ("J. Gibbs"): match initial + last name, using the team code
-  // and position shown on the same line to pick between players who share a name.
+
+  // 2. Abbreviated names ("J. Gibbs"): initial + last name. The team code and position
+  //    on the same line or the one below ("Det - RB") pick between players who share a name.
   const POS_TOKENS: Record<string, Position> = { qb: "QB", rb: "RB", wr: "WR", te: "TE", k: "K" };
+  const initialAtStart = new Set<number>(); // lines like "K. Walker": that "k" is a name, not the kicker slot
   for (const [lineIdx, line] of lines.entries()) {
     const words = line.trim().split(" ");
-    const linePos = new Set(words.map((w) => POS_TOKENS[w]).filter(Boolean));
+    const ctx = `${line} ${lines[lineIdx + 1] ?? ""} ${lines[lineIdx + 2] ?? ""} `;
+    const ctxWords = ctx.trim().split(" ");
     for (let i = 0; i < words.length - 1; i++) {
       if (words[i].length !== 1) continue;
       const initial = words[i];
       for (const last of [`${words[i + 1]} ${words[i + 2] ?? ""}`.trim(), words[i + 1]]) {
         const cands = players.filter((p) => p.position !== "DST" && normalizeName(p.lastName) === last && normalizeName(p.firstName).startsWith(initial));
         if (!cands.length) continue;
-        const fits = cands.filter((p) => (!p.team || line.includes(` ${p.team.toLowerCase()} `)) && (!linePos.size || linePos.has(p.position)));
-        const pick = fits.length === 1 ? fits[0] : cands.length === 1 && !linePos.size ? cands[0] : null;
-        if (pick && !found.has(pick.id)) {
-          found.set(pick.id, { id: pick.id, name: pick.name, position: pick.position, team: pick.team });
-          lineOf.set(pick.id, lineIdx);
+        const ctxPos = new Set(ctxWords.slice(i + 1).map((w) => POS_TOKENS[w]).filter(Boolean));
+        const fits = cands.filter((p) => (!p.team || ctx.includes(` ${p.team.toLowerCase()} `)) && (!ctxPos.size || ctxPos.has(p.position)));
+        // Still more than one (Bijan and Brian Robinson both play for ATL)? Take the far more
+        // fantasy-relevant one; the review screen lets people fix it.
+        const pool = (fits.length ? fits : cands).sort((a, b) => (a.searchRank ?? 1e9) - (b.searchRank ?? 1e9));
+        const clear = pool.length === 1 || (pool[0].searchRank ?? 1e9) * 3 < (pool[1].searchRank ?? 1e9);
+        const pick = clear ? pool[0] : null;
+        if (pick) {
+          add(pick, lineIdx);
+          if (i === 0) initialAtStart.add(lineIdx);
         }
         break;
       }
     }
   }
-  // Small misspellings, mostly from reading screenshots ("Kenneth Waiker"): the closest
-  // fantasy-relevant player, only when one name is clearly closest.
-  // Players already found stay in the comparison, so "Bijan Robinson" can't be read as a typo of "Brian Robinson".
+
+  // 3. Small misspellings, mostly from reading screenshots ("Kenneth Waiker"): the closest
+  //    fantasy-relevant player, only when one name is clearly closest. Players already found
+  //    stay in the comparison, so "Bijan Robinson" can't be read as a typo of "Brian Robinson".
   const relevant = players
     .filter((p) => p.position !== "DST" && ((p.team && p.searchRank !== null && p.searchRank <= 800) || found.has(p.id)))
     .map((p) => ({ p, full: normalizeName(p.name) }))
@@ -141,26 +187,65 @@ export async function matchRosterText(text: string) {
           if (!best || d < best.d) [best, tie] = [{ d, p: k.p }, false];
           else if (d === best.d && best.p.id !== k.p.id) tie = true;
         }
-        if (best && !tie && best.d > 0 && !found.has(best.p.id)) {
-          found.set(best.p.id, { id: best.p.id, name: best.p.name, position: best.p.position, team: best.p.team });
-          lineOf.set(best.p.id, lineIdx);
-        }
+        if (best && !tie && best.d > 0 && !found.has(best.p.id)) add(best.p, lineIdx);
       }
     }
   }
-  // Defenses: "<city> <nickname>" or "<nickname> D/ST|DEF".
+
+  // 4. Defenses, however the app writes them: "Seattle Seahawks", "Seahawks D/ST",
+  //    Yahoo's "Seattle" + "Sea - DEF", or "DEF - SEA".
+  const aliasesOf = (team: string) => [team, ...Object.entries({ WSH: "WAS", JAC: "JAX", LA: "LAR", ARZ: "ARI", GNB: "GB", KAN: "KC", NWE: "NE", NOR: "NO", SFO: "SF", TAM: "TB", LVR: "LV" }).filter(([, to]) => to === team).map(([from]) => from)].map((t) => t.toLowerCase());
   for (const p of players.filter((x) => x.position === "DST")) {
+    const full = normalizeName(p.name);
     const nick = normalizeName(p.lastName);
-    if (whole.includes(` ${normalizeName(p.name)} `) || new RegExp(` ${nick} (d\/st|d st|dst|def|defense) `).test(whole)) {
-      found.set(p.id, { id: p.id, name: p.name, position: p.position, team: p.team });
-      lineOf.set(p.id, lines.findIndex((l) => l.includes(` ${nick} `)));
+    const city = normalizeName(p.firstName);
+    const abbrs = p.team ? aliasesOf(normalizeTeam(p.team)!) : [];
+    const patterns = [
+      new RegExp(` ${nick} ${DEF_WORD} `),
+      new RegExp(` ${city} ${DEF_WORD} `),
+      ...abbrs.map((a) => new RegExp(` (${a} ${DEF_WORD}|${DEF_WORD} ${a}) `)),
+    ];
+    for (const [i, line] of lines.entries()) {
+      const ctx = `${line}${(lines[i + 1] ?? "").trimStart()}`;
+      if (line.includes(` ${full} `) || line.trim() === nick || patterns.some((re) => re.test(line) || re.test(ctx))) {
+        add(p, i); // for Yahoo's "Seattle" + "Sea - DEF" this is the name's line
+
+        break;
+      }
     }
   }
-  if (hasSlots) {
-    for (const m of found.values()) {
-      const i = lineOf.get(m.id);
-      if (i !== undefined && i >= 0) m.starter = !isBench(lines[i]);
-    }
+
+  // 5. Who's starting. Roster pages label each row with its slot (QB, WR, W/R/T, BN…); depending
+  //    on the app, the label lands on the name's line or just above/below it once read from a photo.
+  const markers = new Map<number, string>();
+  for (const [i, line] of lines.entries()) {
+    const slot = slotAt(line);
+    if (slot && !(slot === "K" && initialAtStart.has(i))) markers.set(i, slot);
   }
-  return [...found.values()];
+  const rows = [...found.values()].map((m) => ({ m, line: lineOf.get(m.id) ?? -1 })).filter((x) => x.line >= 0);
+  let slots: string[] | null = null;
+  if (markers.size >= 3) {
+    // Which offset (same line, line above, line below) do this page's labels sit at?
+    const offsets = [0, -1, 1];
+    const score = offsets.map((o) => rows.filter((r) => markers.has(r.line + o)).length);
+    const order = [offsets[score.indexOf(Math.max(...score))], ...offsets];
+    const used = new Set<number>();
+    const header = lines.findIndex((l) => /^ (bench|bench players|reserves?)( \d+)? $/.test(l));
+    for (const r of rows.sort((a, b) => a.line - b.line)) {
+      const o = order.find((x) => markers.has(r.line + x) && !used.has(r.line + x));
+      if (o === undefined) {
+        if (header >= 0) r.m.starter = r.line < header; // a row without its own label, under a "Bench" heading
+        continue;
+      }
+      used.add(r.line + o);
+      r.m.starter = !BENCH.has(markers.get(r.line + o)!);
+    }
+    const list = [...markers.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => s);
+    if (list.includes("QB") && list.filter((s) => !BENCH.has(s)).length >= 6) slots = list;
+  } else {
+    // No per-row labels: ESPN/Sleeper-style "Bench" section header.
+    const header = lines.findIndex((l) => /^ (bench|bench players|reserves?)( \d+)? $/.test(l));
+    if (header >= 0) for (const r of rows) r.m.starter = r.line < header;
+  }
+  return { matched: [...found.values()], slots };
 }
