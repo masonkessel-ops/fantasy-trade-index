@@ -13,7 +13,8 @@ export const metadata: Metadata = {
 const PREMIUM_PERKS = [
   { title: "Every trade idea", text: "See all the fair trades the Trade Finder finds, not just the top 3." },
   { title: "Package deals", text: "The best 2-for-1, 3-for-1, 1-for-2 and 1-for-3 trades for your roster, with a position filter." },
-  { title: "Support the site", text: "Keep Fantasy Trade Index independent, fast and ad-light." },
+  { title: "No partner offers", text: "Premium members never see partner offers or ads." },
+  { title: "Support the site", text: "Keep Fantasy Trade Index independent and fast." },
 ];
 
 const FREE_PERKS = ["Trade values and tiers", "Trade Analyzer with grades", "Auto lineup for the most points", "Trade Assistant", "Rankings, Waiver Wire and Live Tracker", "Top 3 trade ideas per search"];

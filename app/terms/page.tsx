@@ -25,6 +25,12 @@ export default function TermsPage() {
         <h2>Fair use of the site</h2>
         <p>Please don&apos;t overload the site with automated requests, try to break it, or use it for anything illegal. We may limit or block abusive traffic.</p>
 
+        <h2>Partner offers</h2>
+        <p>
+          Some pages show offers from fantasy contest apps, labeled as ads. We may earn a commission if you sign up. Those apps are run by their own companies under
+          their own terms, age limits and state rules. See <a href="/responsible-gaming">Responsible gaming</a>.
+        </p>
+
         <h2>Premium and payments</h2>
         <p>
           Premium is optional. Payments are processed by Stripe. The <b>Monthly</b> plan renews automatically each month until you cancel; cancel anytime under Manage

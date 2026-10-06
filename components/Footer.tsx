@@ -50,6 +50,9 @@ export function Footer() {
           <Link href="/newsletter" className="hover:text-muted">
             Weekly report
           </Link>
+          <Link href="/responsible-gaming" className="hover:text-muted">
+            Responsible gaming
+          </Link>
         </nav>
       </div>
       <p className="mt-6">

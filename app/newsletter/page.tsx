@@ -7,6 +7,7 @@ import { getScoring } from "@/lib/prefs";
 import { getWeeklyReport, type ReportPlayer } from "@/lib/report";
 import { SITE_URL } from "@/lib/site";
 import { CopyReport } from "./CopyReport";
+import { pickOffer } from "@/lib/offers";
 
 export const metadata: Metadata = {
   title: "Weekly Trade Report",
@@ -26,7 +27,7 @@ export default async function NewsletterPage() {
           </>
         }
         subtitle="The week in fantasy trade values, built from live market prices and stats. Get it in your inbox every week."
-        right={<CopyReport report={r} siteUrl={SITE_URL} />}
+        right={<CopyReport report={r} siteUrl={SITE_URL} sponsor={pickOffer(`n${r.week}`)} />}
       />
       <div className="space-y-5">
         <NewsletterSignup source="report-page" />

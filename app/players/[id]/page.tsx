@@ -13,6 +13,8 @@ import { getPlayers } from "@/lib/sleeper";
 import { statLine } from "@/lib/statLine";
 import { PlayerRiskLine } from "./PlayerRiskLine";
 import { PlayerTradeButtons } from "./PlayerTradeButtons";
+import { OfferCard } from "@/components/OfferCard";
+import { pickOffer } from "@/lib/offers";
 
 export async function generateMetadata({ params }: PageProps<"/players/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -187,6 +189,8 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
         </div>
         <WeeklyPointsChart weeks={weeks.filter((w) => w.week <= Math.max(currentWeek + 3, 6))} color={color} />
       </section>
+
+      {player.position !== "K" && player.position !== "DST" && <OfferCard offer={pickOffer(player.id)} title={`Think ${player.name} beats his projection? Make it a pick`} />}
 
       <section className="card animate-rise overflow-hidden [animation-delay:260ms]">
         <h2 className="px-5 pt-5 font-display text-xl font-bold uppercase tracking-wide">Game log</h2>

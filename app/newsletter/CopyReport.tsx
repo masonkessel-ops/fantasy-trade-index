@@ -7,7 +7,9 @@ import type { ReportPlayer, WeeklyReport } from "@/lib/report";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Builds this week's issue as simple email HTML, to paste into the newsletter editor (beehiiv). */
-function toEmail(r: WeeklyReport, siteUrl: string) {
+type Sponsor = { name: string; url: string; text: string } | null;
+
+function toEmail(r: WeeklyReport, siteUrl: string, sponsor: Sponsor) {
   const link = (p: ReportPlayer) => `<a href="${siteUrl}/players/${p.id}">${esc(p.name)}</a>`;
   const list = (title: string, ps: ReportPlayer[]) =>
     ps.length ? `<h2>${title}</h2><ul>${ps.map((p) => `<li><b>${link(p)}</b> (${p.position}, ${p.team ?? "FA"}${p.value !== null ? `, value ${p.value}` : ""}): ${esc(p.note)}</li>`).join("")}</ul>` : "";
@@ -15,6 +17,9 @@ function toEmail(r: WeeklyReport, siteUrl: string) {
   return [
     `<h1>The Weekly Trade Report: Week ${r.week}</h1>`,
     `<p>Your two-minute look at the fantasy trade market this week. Check any trade at <a href="${siteUrl}/trade">Fantasy Trade Index</a>.</p>`,
+    sponsor
+      ? `<p><b>Presented by ${esc(sponsor.name)}:</b> ${esc(sponsor.text)}. <a href="${sponsor.url}">Claim it here</a>.<br/><small>Ad. 21+ (19+ in AL and NE; 18+ in some states). Not available in all states; terms apply. Gambling problem? Call 1-800-GAMBLER.</small></p>`
+      : "",
     list("📈 Biggest risers", r.risers),
     list("📉 Biggest fallers", r.fallers),
     list("🛒 Buy low", r.buyLow),
@@ -25,10 +30,10 @@ function toEmail(r: WeeklyReport, siteUrl: string) {
   ].join("\n");
 }
 
-export function CopyReport({ report, siteUrl }: { report: WeeklyReport; siteUrl: string }) {
+export function CopyReport({ report, siteUrl, sponsor = null }: { report: WeeklyReport; siteUrl: string; sponsor?: Sponsor }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
-    const html = toEmail(report, siteUrl);
+    const html = toEmail(report, siteUrl, sponsor);
     const text = html.replace(/<li>/g, "• ").replace(/<\/(h1|h2|p|li)>/g, "\n").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&");
     try {
       await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]);

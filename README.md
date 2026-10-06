@@ -73,6 +73,14 @@ On **My Team**, [`lib/advice.ts`](lib/advice.ts) builds:
 
 The thresholds (`MIN_LINEUP_GAIN`, `MAX_PARTNER_LOSS`, `MIN_PICKUP_GAIN`…) are at the top of that file.
 
+## Making money (all optional, off until configured)
+
+**Newsletter (beehiiv).** The signup boxes add people to your beehiiv publication when `BEEHIIV_API_KEY` and `BEEHIIV_PUBLICATION_ID` are set (beehiiv → Settings → API; the free plan includes the API after identity verification). Until then, signups are saved in the site database (`SMEMBERS newsletter:emails`). Each week, open `/newsletter`, click **Copy for newsletter**, paste into a new beehiiv post and send. Sponsors: sell spots yourself any time, or join the beehiiv Ad Network (needs its Scale plan and 1,000+ subscribers). Code: [`lib/newsletter.ts`](lib/newsletter.ts), [`lib/report.ts`](lib/report.ts).
+
+**Premium (Stripe).** Requires Google sign-in. In Stripe, create a product with a recurring monthly price and/or a one-time season price, then set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY` and/or `STRIPE_PRICE_SEASON`. Add a webhook endpoint `https://YOUR-SITE/api/stripe/webhook` for `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`, and set its signing secret as `STRIPE_WEBHOOK_SECRET`. Turn on the Customer Portal (Stripe → Settings → Billing) so members can cancel. Free users see the top 3 trade ideas and 1 package deal; members see everything and no partner offers. Code: [`lib/premium.ts`](lib/premium.ts), `app/api/premium/*`, `app/api/stripe/webhook`.
+
+**Partner offers (DFS / pick'em affiliates).** After a partner approves you, set `OFFER_<PARTNER>_URL` (your tracking link) and optionally `OFFER_<PARTNER>_TEXT` (their current promo) for `UNDERDOG`, `PRIZEPICKS`, `SLEEPER` or `DRAFTKINGS`. Cards appear on Weekly Rankings, Waiver Wire and player pages (and as a sponsor line in the copied newsletter) with 21+ and responsible-gaming notices. Code: [`lib/offers.ts`](lib/offers.ts), [`components/OfferCard.tsx`](components/OfferCard.tsx).
+
 ## Accounts: Sign in with Google (optional)
 
 People can sign in with Google to save their team to an account and open it on any device. While signed in, edits save automatically, and the newer copy (this browser's or the account's) wins when you sign in. Code: [`lib/auth.ts`](lib/auth.ts), [`lib/store.ts`](lib/store.ts), [`lib/account.ts`](lib/account.ts), `app/api/auth/*`, `app/api/me/*`.
