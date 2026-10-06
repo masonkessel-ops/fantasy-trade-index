@@ -71,7 +71,7 @@ export function PremiumPlans({
       {account.premium ? (
         <section className="card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 text-white">
+            <span className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-brand to-brand-2 text-bg">
               <Crown className="size-6" />
             </span>
             <div>
@@ -97,14 +97,14 @@ export function PremiumPlans({
             .filter((p) => offered[p.id])
             .map((p) => (
               <section key={p.id} className={clsx("card relative flex flex-col p-6", p.best && "border-rocket/50")}>
-                {p.best && <span className="absolute -top-2.5 right-5 rounded-full bg-gradient-to-r from-brand to-brand-2 px-3 py-0.5 text-[11px] font-bold text-white">Best value</span>}
+                {p.best && <span className="absolute -top-2.5 right-5 rounded-full bg-gradient-to-r from-brand to-brand-2 px-3 py-0.5 text-[11px] font-bold text-bg">Best value</span>}
                 <div className="font-display text-xl font-bold uppercase">{p.name}</div>
                 <div className="mt-1 font-display text-4xl font-extrabold">{p.price ?? <span className="text-xl text-muted">Price shown at checkout</span>}</div>
                 <p className="mt-1 text-sm text-muted">{p.note}</p>
                 <button
                   onClick={() => go("/api/premium/checkout", { plan: p.id }, p.id)}
                   disabled={!!busy}
-                  className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+                  className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-60"
                 >
                   {busy === p.id ? <Loader2 className="size-4 animate-spin" /> : <Crown className="size-4" />}
                   {account.user ? `Get ${p.name}` : "Sign in with Google to upgrade"}

@@ -35,7 +35,7 @@ export function TradeFinderPage({ players, initialAway, initialWant }: { players
         </div>
         <Link
           href="/my-team"
-          className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110"
+          className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-bg transition hover:brightness-110"
         >
           Set up My Team
         </Link>

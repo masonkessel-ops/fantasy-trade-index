@@ -170,7 +170,7 @@ export function Lineup({
           ) : (
             <button
               onClick={turnOnAuto}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-brand to-brand-2 px-4 text-sm font-bold text-white transition hover:brightness-110"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-brand to-brand-2 px-4 text-sm font-bold text-bg transition hover:brightness-110"
             >
               <Sparkles className="size-4" /> Auto lineup{gain > 0 ? ` +${gain}` : ""}
             </button>

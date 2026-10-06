@@ -17,7 +17,7 @@ export default function Error({ error, retry }: { error: Error & { digest?: stri
       <div className="mt-6 flex gap-2">
         <button
           onClick={() => retry()}
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110"
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-bg transition hover:brightness-110"
         >
           <RotateCcw className="size-4" /> Try again
         </button>

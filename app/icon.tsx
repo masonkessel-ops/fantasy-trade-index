@@ -21,7 +21,7 @@ export function Mark({ size: s }: { size: number }) {
         display: "flex",
         position: "relative",
         borderRadius: s * 0.28,
-        background: "linear-gradient(45deg, #2563eb, #7c3aed)",
+        background: "linear-gradient(45deg, #06b6d4, #3b82f6)",
       }}
     >
       {bar(7.5, 18, 7)}

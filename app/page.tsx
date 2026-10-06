@@ -59,7 +59,7 @@ export default async function Home() {
         <div className="relative mt-6 flex flex-wrap gap-2">
           <Link
             href="/my-team"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_30px_-8px] shadow-rocket/60 transition hover:brightness-110"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 py-2.5 text-sm font-bold text-bg shadow-[0_8px_30px_-8px] shadow-rocket/60 transition hover:brightness-110"
           >
             Set up my team <ArrowRight className="size-4" />
           </Link>

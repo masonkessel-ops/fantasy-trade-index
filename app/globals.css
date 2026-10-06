@@ -1,24 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  /* Surfaces: near-black with a faint violet cast */
-  --color-bg: #07070c;
-  --color-surface: #0e0e17;
-  --color-surface-2: #15151f;
-  --color-surface-3: #1e1e2c;
+  /* Surfaces: deep navy */
+  --color-bg: #050912;
+  --color-surface: #0a111d;
+  --color-surface-2: #101a2a;
+  --color-surface-3: #172438;
   --color-line: rgb(255 255 255 / 0.07);
   --color-line-strong: rgb(255 255 255 / 0.13);
-  --color-ink: #f4f4f8;
-  --color-muted: #9494ab;
-  --color-faint: #5e5e76;
+  --color-ink: #f2f6fc;
+  --color-muted: #8fa0ba;
+  --color-faint: #56657e;
 
-  /* Brand: violet -> blue (buttons, active states); rocket = violet for text/icons/links */
-  --color-brand: #7c3aed;
-  --color-brand-2: #2563eb;
-  --color-rocket: #a78bfa;
-  --color-volt: #22d3ee;
+  /* Brand: electric blue -> cyan (buttons, active states, dark text on top); rocket = blue for text/icons/links */
+  --color-brand: #3b82f6;
+  --color-brand-2: #06b6d4;
+  --color-rocket: #60a5fa;
+  /* Accent: gold (highlights, "you get", elite) */
+  --color-volt: #facc15;
   /* Status */
-  --color-flame: #fbbf24;
+  --color-flame: #fb923c;
   --color-up: #34d399;
   --color-down: #fb7185;
 
@@ -66,8 +67,8 @@ html {
 
 body {
   background:
-    radial-gradient(1200px 600px at 85% -10%, rgb(124 58 237 / 0.14), transparent 60%),
-    radial-gradient(900px 500px at -10% 10%, rgb(34 211 238 / 0.06), transparent 60%),
+    radial-gradient(1200px 600px at 85% -10%, rgb(59 130 246 / 0.16), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, rgb(250 204 21 / 0.05), transparent 60%),
     var(--color-bg);
   background-attachment: fixed;
   color: var(--color-ink);
@@ -76,7 +77,7 @@ body {
 }
 
 ::selection {
-  background: rgb(167 139 250 / 0.35);
+  background: rgb(96 165 250 / 0.35);
 }
 
 @utility card {
@@ -86,7 +87,7 @@ body {
 }
 
 @utility text-gradient {
-  background: linear-gradient(100deg, #c4b5fd, #67e8f9);
+  background: linear-gradient(100deg, #93c5fd, #67e8f9);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

@@ -12,7 +12,7 @@ import { valueColor } from "@/lib/ui";
 import type { PlayerValue } from "@/lib/types";
 
 /** One color per compared player (for the chart and headers). */
-const SERIES = ["#a78bfa", "#22d3ee", "#fbbf24"];
+const SERIES = ["#60a5fa", "#facc15", "#f472b6"];
 
 type Row = { label: string; get: (p: PlayerValue) => number | null; fmt?: (n: number, p: PlayerValue) => string; lowerIsBetter?: boolean; hint?: string };
 const ROWS: Row[] = [
@@ -41,7 +41,7 @@ export function CompareView({ players, initialIds }: { players: PlayerValue[]; i
     window.history.replaceState(null, "", url);
   }, [ids]);
 
-  const cols = `minmax(8.5rem,1fr) repeat(${Math.max(1, ps.length)}, minmax(0,1fr))`;
+  const cols = `minmax(5.5rem,1fr) repeat(${Math.max(1, ps.length)}, minmax(0,1fr))`;
 
   return (
     <div className="space-y-5">
@@ -59,17 +59,17 @@ export function CompareView({ players, initialIds }: { players: PlayerValue[]; i
             <div className="grid border-b border-line" style={{ gridTemplateColumns: cols }}>
               <span />
               {ps.map((p, i) => (
-                <div key={p.id} className="relative flex flex-col items-center gap-1.5 px-2 py-4 text-center">
+                <div key={p.id} className="relative flex min-w-0 flex-col items-center gap-1.5 px-1 py-4 text-center sm:px-2">
                   <button onClick={() => setIds((x) => x.filter((id) => id !== p.id))} aria-label={`Remove ${p.name}`} className="absolute right-2 top-2 rounded-full p-1 text-faint hover:bg-white/5 hover:text-ink">
                     <X className="size-4" />
                   </button>
                   <span className="rounded-full p-[3px]" style={{ background: SERIES[i] }}>
                     <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={56} />
                   </span>
-                  <Link href={`/players/${p.id}`} className="w-full truncate text-sm font-semibold hover:underline">
+                  <Link href={`/players/${p.id}`} className="line-clamp-2 w-full text-sm font-semibold leading-tight hover:underline">
                     {p.name}
                   </Link>
-                  <span className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="flex flex-wrap items-center justify-center gap-1.5 text-xs text-muted">
                     <PosBadge pos={p.position} /> {p.team ?? "FA"} <InjuryTag status={p.injuryStatus} />
                   </span>
                   <ValueBadge value={p.value} />
@@ -85,7 +85,7 @@ export function CompareView({ players, initialIds }: { players: PlayerValue[]; i
               const best = nums.length > 1 && new Set(nums).size > 1 ? (r.lowerIsBetter ? Math.min(...nums) : Math.max(...nums)) : null;
               return (
                 <div key={r.label} className="grid border-b border-line last:border-0" style={{ gridTemplateColumns: cols }}>
-                  <span className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-faint" title={r.hint}>
+                  <span className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-faint sm:px-4" title={r.hint}>
                     {r.label}
                   </span>
                   {vals.map((v, i) => (
@@ -104,7 +104,7 @@ export function CompareView({ players, initialIds }: { players: PlayerValue[]; i
             <div className="flex flex-wrap gap-2">
               <Link
                 href={`/trade?give=${ps[1].id}&get=${ps[0].id}`}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-bg transition hover:brightness-110"
               >
                 <ArrowLeftRight className="size-4" /> Check {ps[1].name.split(" ").slice(-1)[0]} for {ps[0].name.split(" ").slice(-1)[0]}
               </Link>

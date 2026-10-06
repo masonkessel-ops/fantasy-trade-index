@@ -44,7 +44,7 @@ export default async function TeamOfTheWeekPage({ searchParams }: PageProps<"/te
             href={wk === t.currentWeek ? "/team-of-the-week" : `/team-of-the-week?week=${wk}`}
             className={clsx(
               "grid h-9 min-w-16 shrink-0 place-items-center rounded-full px-4 text-xs font-bold transition",
-              wk === t.week ? "bg-gradient-to-r from-brand to-brand-2 text-white" : "bg-surface text-muted ring-1 ring-line hover:text-ink",
+              wk === t.week ? "bg-gradient-to-r from-brand to-brand-2 text-bg" : "bg-surface text-muted ring-1 ring-line hover:text-ink",
             )}
           >
             Week {wk}

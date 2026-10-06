@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Fantasy football trade values, trade analyzer, trade finder and auto lineup.",
     start_url: "/my-team",
     display: "standalone",
-    background_color: "#07070c",
-    theme_color: "#07070c",
+    background_color: "#050912",
+    theme_color: "#050912",
     icons: [
       { src: "/icon", sizes: "64x64", type: "image/png" },
       { src: "/apple-icon", sizes: "180x180", type: "image/png", purpose: "any" },

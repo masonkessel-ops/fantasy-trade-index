@@ -141,7 +141,7 @@ function PlayerToken({ spot, mvp, compact }: { spot: Spot; mvp: boolean; compact
         {mvp && (
           <Crown className="absolute -top-4 left-1/2 size-4 -translate-x-1/2 fill-flame text-flame drop-shadow sm:-top-5 sm:size-5" />
         )}
-        <div className={clsx("rounded-full p-[3px]", mvp && "animate-pulse")} style={{ background: mvp ? "linear-gradient(135deg,#22d3ee,#7c3aed)" : color }}>
+        <div className={clsx("rounded-full p-[3px]", mvp && "animate-pulse")} style={{ background: mvp ? "linear-gradient(135deg,#facc15,#3b82f6)" : color }}>
           <PlayerAvatar id={p.id} position={p.position} team={p.team} name={p.name} size={compact ? 42 : 56} />
         </div>
         <span

@@ -44,7 +44,7 @@ export function NewsletterSignup({ source, compact = false, className }: { sourc
         />
         <button
           disabled={state === "busy"}
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-60"
         >
           {state === "busy" ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />} Get it free
         </button>

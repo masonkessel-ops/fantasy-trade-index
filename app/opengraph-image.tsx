@@ -22,7 +22,7 @@ export default function OpengraphImage() {
           flexDirection: "column",
           justifyContent: "space-between",
           padding: 72,
-          background: "radial-gradient(900px 500px at 90% 0%, rgba(124,58,237,0.45), transparent 60%), radial-gradient(700px 400px at 0% 100%, rgba(34,211,238,0.18), transparent 60%), #07070c",
+          background: "radial-gradient(900px 500px at 90% 0%, rgba(59,130,246,0.45), transparent 60%), radial-gradient(700px 400px at 0% 100%, rgba(250,204,21,0.14), transparent 60%), #050912",
           color: "#f4f4f8",
           fontFamily: "sans-serif",
         }}
@@ -30,7 +30,7 @@ export default function OpengraphImage() {
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           <Mark size={96} />
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 28, letterSpacing: 8, color: "#9494ab" }}>FANTASY</div>
+            <div style={{ fontSize: 28, letterSpacing: 8, color: "#8fa0ba" }}>FANTASY</div>
             <div style={{ fontSize: 56, fontWeight: 800 }}>Trade Index</div>
           </div>
         </div>

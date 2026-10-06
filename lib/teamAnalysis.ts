@@ -81,6 +81,14 @@ export function gradeColor(grade: string) {
 
 const POS_ORDER: Position[] = ["QB", "RB", "WR", "TE", "K", "DST"];
 
+/** Who typically fills each flex slot, used when a league has no dedicated slot for a position. */
+const FLEX_SHARE: Record<string, Partial<Record<Position, number>>> = {
+  FLEX: { RB: 0.4, WR: 0.5, TE: 0.1 },
+  WRRB_FLEX: { RB: 0.5, WR: 0.5 },
+  REC_FLEX: { WR: 0.75, TE: 0.25 },
+  SUPER_FLEX: { QB: 0.9, RB: 0.03, WR: 0.05, TE: 0.02 },
+};
+
 /**
  * Compare a roster's starters at each position against a league-average
  * starter. Benchmark for the k-th starter at a position = the median player at
@@ -88,9 +96,14 @@ const POS_ORDER: Position[] = ["QB", "RB", "WR", "TE", "K", "DST"];
  */
 export function analyzeTeam(roster: PlayerValue[], board: PlayerValue[], rosterPositions: string[], teams = 12) {
   const dedicated = (pos: Position) => rosterPositions.filter((s) => SLOT_ELIGIBLE[s]?.length === 1 && SLOT_ELIGIBLE[s][0] === pos).length;
+  // All-flex leagues (e.g. QB + W/R + W/T + SF) still get RB/WR/TE grades.
+  const flexOnly = (pos: Position) => {
+    const share = rosterPositions.reduce((s, slot) => s + (FLEX_SHARE[slot]?.[pos] ?? 0), 0);
+    return share >= 0.25 ? Math.max(1, Math.round(share)) : 0;
+  };
   const strengths: PositionStrength[] = [];
   for (const pos of POS_ORDER) {
-    const slots = dedicated(pos);
+    const slots = dedicated(pos) || flexOnly(pos);
     if (!slots) continue;
     const mineSorted = roster.filter((p) => p.position === pos).sort((a, b) => b.value - a.value);
     const boardSorted = board.filter((p) => p.position === pos).sort((a, b) => b.value - a.value);

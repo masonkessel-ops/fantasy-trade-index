@@ -50,7 +50,7 @@ export function RankingsTable({ rows }: { rows: WeeklyRow[] }) {
             onClick={() => setOnlyMine((v) => !v)}
             className={clsx(
               "h-8 shrink-0 rounded-full px-3.5 text-xs font-bold transition",
-              onlyMine ? "bg-gradient-to-r from-brand to-brand-2 text-white" : "bg-surface text-muted ring-1 ring-line hover:text-ink",
+              onlyMine ? "bg-gradient-to-r from-brand to-brand-2 text-bg" : "bg-surface text-muted ring-1 ring-line hover:text-ink",
             )}
           >
             Only my team

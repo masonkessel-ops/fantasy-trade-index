@@ -129,13 +129,13 @@ export function TeamDashboard({
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           {team.league && (
             <>
               <select
                 value={team.league.myRosterId}
                 onChange={(e) => switchRoster(Number(e.target.value))}
-                className="h-9 max-w-44 rounded-full border border-line bg-surface px-3 text-xs font-medium outline-none"
+                className="h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-3 text-xs font-medium outline-none sm:max-w-44 sm:flex-none"
                 aria-label="Switch team"
               >
                 {team.league.teams.map((t) => (
@@ -147,7 +147,7 @@ export function TeamDashboard({
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:text-ink"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:text-ink"
               >
                 {refreshing ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Sync
               </button>
@@ -157,7 +157,7 @@ export function TeamDashboard({
             onClick={() => {
               if (confirm("Remove this team from Fantasy Trade Index? (Your league itself is not affected.)")) onChange(null);
             }}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:border-down/40 hover:text-down"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted transition hover:border-down/40 hover:text-down"
           >
             <Trash2 className="size-3.5" /> Reset
           </button>

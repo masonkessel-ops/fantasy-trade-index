@@ -9,13 +9,13 @@ export const POS_COLOR: Record<Position, string> = {
   DST: "var(--color-dst)",
 };
 
-/** Colour for a 1–100 trade value by tier: Elite (fuchsia) → Star → Starter → Flex → Depth (slate). */
+/** Colour for a 1–100 trade value by tier: Elite (gold) → Star (blue) → Starter (cyan) → Flex (violet) → Depth (slate). */
 export function valueColor(value: number) {
-  if (value >= 93) return "#e879f9";
-  if (value >= 85) return "#a78bfa";
-  if (value >= 76) return "#60a5fa";
-  if (value >= 65) return "#2dd4bf";
-  return "#8b8ba3";
+  if (value >= 93) return "#facc15";
+  if (value >= 85) return "#60a5fa";
+  if (value >= 76) return "#22d3ee";
+  if (value >= 65) return "#a78bfa";
+  return "#8494ad";
 }
 
 export const INJURY_SHORT: Record<string, string> = {

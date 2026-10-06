@@ -16,7 +16,7 @@ export function PremiumNavLink({ onClick }: { onClick?: () => void }) {
     <Link
       href="/premium"
       onClick={onClick}
-      className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-3 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
+      className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-3 py-2.5 text-sm font-bold text-bg transition hover:brightness-110"
     >
       <Crown className="size-4" /> Go Premium
     </Link>

@@ -38,7 +38,7 @@ export function ScoringToggle({ scoring, compact = false }: { scoring: Scoring; 
             }}
             className={clsx(
               "relative flex-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-              active ? "text-white" : "text-muted hover:text-ink",
+              active ? "text-bg" : "text-muted hover:text-ink",
             )}
           >
             {active && (

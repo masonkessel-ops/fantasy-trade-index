@@ -163,7 +163,7 @@ function Body({
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => onTradeAway(p.id)}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 text-sm font-bold text-white transition hover:brightness-110"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 text-sm font-bold text-bg transition hover:brightness-110"
         >
           <ArrowUpFromLine className="size-4" /> Trade away
         </button>

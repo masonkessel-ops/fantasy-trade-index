@@ -26,7 +26,7 @@ const TABS: { id: Mode; label: string; short: string }[] = [
 const inputCls =
   "h-12 min-w-0 flex-1 rounded-xl border border-line bg-surface-2 px-4 text-sm outline-none transition placeholder:text-faint focus:border-rocket/50 focus:ring-4 focus:ring-rocket/10";
 const primaryBtn =
-  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50";
+  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-50";
 
 export function TeamSetup({
   players,
@@ -744,7 +744,7 @@ function ManualBuilder({
                 updatedAt: Date.now(),
               })
             }
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-white transition hover:brightness-110"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-2 px-5 text-sm font-bold text-bg transition hover:brightness-110"
           >
             Save team <ArrowRight className="size-4" />
           </button>
