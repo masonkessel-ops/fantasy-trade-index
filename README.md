@@ -1,8 +1,8 @@
 # Fantasy Trade Index 📈
 
-A fantasy football trade companion: live 1–100 trade values, a trade analyzer, a trade finder, an instant trade assistant (with optional Claude backup), a live weekly tracker and a Team of the Week, all with a dark, mobile-friendly UI.
+A fantasy football trade companion: live 1–100 trade values, a trade analyzer, a trade finder, an instant trade assistant (no AI), a live weekly tracker and a Team of the Week, all with a dark, mobile-friendly UI.
 
-Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**, using the free [Sleeper API](https://docs.sleeper.com) for players, stats, projections, scores and leagues, plus the [Anthropic API](https://docs.claude.com) for the assistant.
+Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**, using the free [Sleeper API](https://docs.sleeper.com) for players, stats, projections, scores and leagues, plus the optional [Anthropic API](https://docs.claude.com) for reading roster screenshots.
 
 ## Features
 
@@ -11,7 +11,7 @@ Built with **Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Motion**
 | **Home** | Hot players (last 3 games vs. season), top trade values, live top scorers, value risers and fallers |
 | **Trade Values** (`/values`) | Every relevant QB/RB/WR/TE/K/DST on a 1–100 scale. Search, sort, and filter by position and team. Each player has a detail page with a value trend chart, factor breakdown, weekly points vs. projection and a game log |
 | **Trade Analyzer** (`/trade`) | Build both sides and get a win / fair / lose verdict on an animated meter, plus suggested players to even out the deal. Trades are shareable by URL |
-| **Trade Assistant** (`/assistant`) | Ask about trades, values and lineups in plain English ("Walker for Puka?", "What can I get for McBride?", "Who should I start?"). Answers instantly from the site's own math, no AI needed. With an Anthropic key set, questions it doesn't understand go to Claude |
+| **Trade Assistant** (`/assistant`) | Ask about trades, values and lineups in plain English ("Walker for Puka?", "What can I get for McBride?", "Who should I start?"). It can also build trades ("make me a trade with Walker and Rice", "make me a trade for a QB"). Answers instantly from the site's own math, no AI |
 | **Live Tracker** (`/live`) | Refreshes every 60s: top scorers by position, booms and busts vs. projection, and a scoreboard with each game's top fantasy performers |
 | **Team of the Week** (`/team-of-the-week`) | The highest-scoring possible lineup (QB, 2 RB, 2 WR, TE, FLEX, K, DST) on a football-field graphic, with a week picker |
 | **My Team** (`/my-team`) | Starting lineup and bench with this week's points (tap a player for their card and a **Trade away** shortcut). Sign in with Google to save your team. Import from **Sleeper**, **Yahoo** (sign in), **ESPN** (league ID; private leagues via cookies), a **screenshot** of any fantasy app (read by Claude), **pasted** roster text, or build one by hand. Includes a **Trade finder**: pick players to trade away and see what you could get, or pick a player you want and see what to offer. Shows total value, position grades, strongest/weakest spots, league power rankings, and a **game plan**: start/sit swaps, waiver pickups and trades you should make |
@@ -30,7 +30,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Open `.env.local` and paste your Anthropic API key (from [console.anthropic.com](https://console.anthropic.com/)). The key is optional: it powers photo roster import and the Trade Assistant's AI backup. Everything else works without it.
+Open `.env.local` and paste your Anthropic API key (from [console.anthropic.com](https://console.anthropic.com/)). The key is optional: it only powers photo roster import. Everything else works without it.
 
 ```bash
 npm run dev
@@ -120,17 +120,7 @@ ESPN has no official API, so the site uses the same endpoint ESPN's own website 
 
 ## The Trade Assistant
 
-The assistant answers without AI: [`lib/bot/names.ts`](lib/bot/names.ts) finds the players in a question (full names, last names, nicknames like "jsn", small typos) and [`lib/bot/engine.ts`](lib/bot/engine.ts) recognizes the kind of question (trade check, what can I get, what would it take, start/sit, best lineup, value, compare, rankings, risers/fallers, buy low/sell high, team grades) and answers with the trade analyzer, trade finder and lineup math. To teach it a new kind of question, add a rule and an answer function in `engine.ts`.
-
-### AI backup (optional)
-
-When `ANTHROPIC_API_KEY` is set, questions the rules don't understand are passed to Claude:
-
-- [`app/api/assistant/route.ts`](app/api/assistant/route.ts) calls Claude with the official `@anthropic-ai/sdk` and streams the answer to the browser. **The API key stays on the server** and is never sent to the browser.
-- Context sent to Claude: instructions, the top ~260 players' values and stats (prompt-cached, since it only changes every few minutes), your roster, your league's scoring settings, and the other teams' rosters. See [`lib/assistant.ts`](lib/assistant.ts).
-- Default model: `claude-opus-5-5`. Set `ANTHROPIC_MODEL=claude-sonnet-5-5` to roughly halve the per-token cost.
-- The request enables Anthropic's server-side refusal fallback (`fallbacks: "default"`), which re-runs a request on a fallback model if a safety classifier declines it.
-- A simple per-IP rate limit (25 messages per 10 minutes per server instance) guards your credits on a public deploy. For stricter limits, set a monthly spend cap in the Anthropic Console.
+The assistant answers without AI: [`lib/bot/names.ts`](lib/bot/names.ts) finds the players in a question (full names, last names, nicknames like "jsn", small typos) and [`lib/bot/engine.ts`](lib/bot/engine.ts) recognizes the kind of question (trade check, make me a trade, what can I get, what would it take, start/sit, best lineup, value, compare, rankings, risers/fallers, buy low/sell high, team grades) and answers with the trade analyzer, trade finder and lineup math. To teach it a new kind of question, add a rule and an answer function in `engine.ts`.
 
 ## Deploy to Vercel (free)
 
@@ -147,9 +137,8 @@ When `ANTHROPIC_API_KEY` is set, questions the rules don't understand are passed
    Then create an empty repo on GitHub and follow its "push an existing repository" instructions.
 
 2. Go to [vercel.com/new](https://vercel.com/new), sign in with GitHub, and **import** the repo. Vercel detects Next.js automatically, so you can keep the default settings.
-3. Before (or after) the first deploy, open **Settings → Environment Variables** and add:
+3. (Optional, only for photo roster import) open **Settings → Environment Variables** and add:
    - `ANTHROPIC_API_KEY` = your key
-   - (optional) `ANTHROPIC_MODEL`
 4. Click **Deploy**. If you added the key after the first deploy, redeploy (Deployments → ⋯ → Redeploy) so it takes effect.
 
 The free Hobby plan is plenty for this app. Every push to `main` redeploys automatically.
@@ -164,7 +153,6 @@ npx vercel
 
 ```
 app/                 pages + API routes (App Router)
-  api/assistant/     streaming Claude endpoint
   api/sleeper/       Sleeper user/league proxy for team import
   api/values/        trade value board as JSON
 components/          shared UI (nav, charts, player badges, search…)
@@ -175,7 +163,7 @@ lib/
   tradeAnalysis.ts   trade verdicts + "even it out" suggestions
   teamAnalysis.ts    best lineup, position grades
   live.ts / totw.ts  live week + Team of the Week
-  assistant.ts       Claude prompt + trade-card parsing
+  bot/               Trade Assistant: name finder + question engine (no AI)
 ```
 
 Data © Sleeper. Not affiliated with Sleeper or the NFL.

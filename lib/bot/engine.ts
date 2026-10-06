@@ -153,13 +153,28 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
     return finish(tradeReply(give, get, tokens[sep] === "worth"));
   }
 
+  /* ------------------------ "make me a trade" ---------------------------- */
+  // "make me a trade with Walker and McBride", "build a trade for a QB", "give me trade ideas"
+  const wantedPos = (tokens.join(" ").match(/\bfor (?:a |an |another |some |better |good |new )?(qbs?|rbs?|wrs?|tes?|kickers?|k|dst|def|defense|quarterback|running|receivers?|tight)\b/)?.[1] ?? null) as string | null;
+  const pos = wantedPos ? POS_WORDS[wantedPos] : null;
+  const makeTrade = has(/ (make|build|create|find|give|show|suggest|come up with|cook up|set up|need|want) (me )?(a |an |some |any |good |fair |better |new )*trades? /) || has(/ trade (ideas?|suggestions?) /);
+  if (makeTrade || (pos && has(/ trade /))) {
+    if (!team && !ps.length) return needTeam("build you a trade");
+    if (!ps.length) return finish(targetReply(pos));
+    const ours = ps.filter((p) => mineIds.has(p.id));
+    const theirs = ps.filter((p) => !mineIds.has(p.id));
+    if (team && ours.length && theirs.length) return finish(tradeReply(ours, theirs));
+    if (team && !ours.length) return finish(acquireReply(theirs));
+    return finish(shopReply(ps, pos));
+  }
+
   /* --------------------- shop a player / get a player --------------------- */
   const acquireWords = / (trade for|what would it take|what will it take|what does it take|what it takes|how (do|can|could|would) i (get|land|acquire|trade for)|acquire|buy|go after|target|pry|should i offer|what (do|should) i offer|how much (for|to get)|i want|cost to get|get him) /;
   const shopWords = / (what (can|could|would|will|do) i get|get for|trade away|sell|shop|shopping|get rid of|dump|move|market for|what offers|any offers|trade value|whats he worth in a trade|deal) /;
   if (ps.length && has(acquireWords)) return finish(acquireReply(ps));
-  if (ps.length && has(shopWords)) return finish(team && ps.every((p) => !mineIds.has(p.id)) && has(/ (get|trade for) /) ? acquireReply(ps) : shopReply(ps));
+  if (ps.length && has(shopWords)) return finish(team && ps.every((p) => !mineIds.has(p.id)) && has(/ (get|trade for) /) ? acquireReply(ps) : shopReply(ps, pos));
   if (ps.length && has(/ (trade|trading|offer|deal) /) && !has(/ (worth|value) /)) {
-    return finish(team && ps.every((p) => mineIds.has(p.id)) ? shopReply(ps) : team ? acquireReply(ps) : shopReply(ps));
+    return finish(team && ps.every((p) => mineIds.has(p.id)) ? shopReply(ps, pos) : team ? acquireReply(ps) : shopReply(ps, pos));
   }
 
   /* ------------------------------ start / sit ----------------------------- */
@@ -264,15 +279,17 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
     };
   }
 
-  function shopReply(xs: PlayerValue[]): BotReply {
+  function shopReply(xs: PlayerValue[], wantPos: Position | null = null): BotReply {
     const notMine = team ? xs.filter((p) => !mineIds.has(p.id)) : [];
     const myRoster = team ? [...mine, ...notMine] : xs;
-    const usePools = pools.map((p) => ({ ...p, roster: p.roster.filter((x) => !xs.includes(x)) }));
+    // "trade Walker for a WR": only look at that position on the other side.
+    const usePools = pools.map((p) => ({ ...p, roster: p.roster.filter((x) => !xs.includes(x) && (!wantPos || x.position === wantPos)) }));
     const ideas = shopPlayers(xs, myRoster, usePools, rp, 6);
     const weight = Math.round(evaluateTrade(xs, xs).adjGive);
+    const forPos = wantPos ? ` for a ${wantPos === "DST" ? "defense" : wantPos}` : "";
     let text = ideas.length
-      ? `Fair trades for ${bold(xs)} (${weight} trade weight)${league ? ` with teams in ${league.name}` : ""}, best fits first:`
-      : `I couldn't find a fair deal for ${bold(xs)} that keeps both lineups full. Try adding another player, or ask what a specific player would cost.`;
+      ? `Fair trades for ${bold(xs)}${forPos} (${weight} trade weight)${league ? ` with teams in ${league.name}` : ""}, best fits first:`
+      : `I couldn't find a fair deal for ${bold(xs)}${forPos} that keeps both lineups full. Try adding another player, or ask what a specific player would cost.`;
     if (notMine.length) text = `${bold(notMine)} ${notMine.length > 1 ? "aren't" : "isn't"} on your team, but here's what ${notMine.length > 1 ? "they'd" : "he'd"} fetch:\n\n${text}`;
     return {
       text,
@@ -282,6 +299,40 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
       ],
       suggestions: [`What's ${xs[0].name} worth?`, ...(team ? ["Grade my team"] : []), `Top 10 ${POS_PLURAL[xs[0].position]}`],
       focus: xs.map((p) => p.id),
+    };
+  }
+
+  /** "Make me a trade" with no players named: fair offers for realistic upgrades at a position (your weakest by default). */
+  function targetReply(wantPos: Position | null): BotReply {
+    const teams = league?.totalRosters ?? 12;
+    const target = wantPos ?? analyzeTeam(mine, players, rp, teams).weakest?.position ?? "RB";
+    const myBest = mine.find((p) => p.position === target);
+    const cands = pools
+      .flatMap((p) => p.roster)
+      .filter((p) => p.position === target && p.value >= (myBest?.value ?? 0) + 5)
+      .sort((a, b) => a.value - b.value)
+      .slice(0, 10);
+    const seen = new Set<string>();
+    const ideas = cands
+      .flatMap((c) => findOffers([c], mine, rp, ownerOf(c.id), 2))
+      .sort((a, b) => b.lineupGain - a.lineupGain || b.balance - a.balance)
+      .filter((i) => {
+        const k = i.get.join();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      })
+      .slice(0, 6);
+    const label = target === "DST" ? "defense" : target;
+    const why = wantPos ? "" : ` That's your weakest spot right now.`;
+    const text = ideas.length
+      ? `Here are fair trades that upgrade your **${label}**${myBest ? ` (now ${myBest.name}, ${myBest.value})` : ""}, biggest lineup boost first.${why}`
+      : `I couldn't find a fair trade that upgrades your ${label} without leaving a hole in your lineup. Try naming players you'd give up, like "make me a trade with Walker and Rice".`;
+    return {
+      text,
+      blocks: ideas.length ? [{ kind: "trades", cards: ideas.map((i) => ideaCard(i, "Trade idea")) }] : [],
+      suggestions: [...(mine[0] ? [`Make me a trade with ${mine[0].name}`] : []), ...(["QB", "RB", "WR", "TE"] as Position[]).filter((p) => p !== target).slice(0, 2).map((p) => `Make me a trade for a ${p}`)],
+      focus: ideas.flatMap((i) => i.get).slice(0, 1),
     };
   }
 
@@ -542,7 +593,19 @@ export function helpReply(mine: PlayerValue[], players: PlayerValue[]): BotReply
   };
 }
 
+/** "What can I ask?" */
+export const HELP_TEXT = `Type any fantasy question and I'll answer from the numbers. I can:
+- **Check a trade:** "Walker for Puka?", "Is Watson worth JSN?"
+- **Make you a trade:** "Make me a trade with Walker and Rice", "Make me a trade for a QB", "Trade Walker for a WR"
+- **Shop a player or find a price:** "What can I get for McBride?", "What would it take to get Gibbs?"
+- **Set your lineup:** "Who should I start?", "Start Diggs or McConkey?", "Should I start Stafford?"
+- **Value and compare players:** "What's Bijan worth?", "Bijan vs Gibbs", "Is McBride hurt?"
+- **Rankings and trends:** "Top 10 WRs", "Who's rising?", "Buy low", "Sell high"
+- **Your team:** "Grade my team", "What's my weakest spot?"`;
+
 export const EXAMPLES = [
+  "Make me a trade",
+  "Make me a trade with Walker and Rice",
   "Walker for Puka?",
   "What can I get for McBride?",
   "What would it take to get Gibbs?",

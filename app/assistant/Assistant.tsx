@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import clsx from "clsx";
-import { ArrowRight, ArrowUp, Check, MessagesSquare, RotateCcw, Sparkles, Square, Users, Zap } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, HelpCircle, MessagesSquare, RotateCcw, Sparkles, Users, Zap } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { Markdown } from "@/components/Markdown";
 import { TradeIdeaCard } from "@/components/TradeIdeaCard";
@@ -12,51 +12,27 @@ import { ChangePill, InjuryTag, PlayerAvatar, PosBadge, ValueBadge } from "@/com
 import { RiskTag } from "@/components/RiskReward";
 import { useMyTeam, type SavedTeam } from "@/lib/myTeam";
 import { buildNameIndex } from "@/lib/bot/names";
-import { EXAMPLES, answer, helpReply, type Block, type WeekData } from "@/lib/bot/engine";
+import { EXAMPLES, HELP_TEXT, answer, helpReply, type Block, type WeekData } from "@/lib/bot/engine";
 import { playerRisk } from "@/lib/risk";
 import { SLOT_ELIGIBLE, SLOT_LABEL, gradeColor } from "@/lib/teamAnalysis";
 import { POS_COLOR } from "@/lib/ui";
 import { SCORINGS, type PlayerValue, type Scoring } from "@/lib/types";
 
-/** Trade cards from the AI backup (same shape the AI route streams). */
-interface AiTrade {
-  title: string;
-  give: string[];
-  get: string[];
-  partner: string | null;
-  why: string;
-}
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   blocks?: Block[];
   suggestions?: string[];
-  trades?: AiTrade[];
   error?: string;
   streaming?: boolean;
-  ai?: boolean;
 }
 
-function teamPayload(team: SavedTeam | null) {
-  if (!team) return undefined;
-  return {
-    name: team.name,
-    playerIds: team.playerIds,
-    rosterPositions: team.rosterPositions,
-    scoringSettings: team.league?.scoringSettings,
-    leagueName: team.league?.name,
-    totalRosters: team.league?.totalRosters,
-    leagueTeams: team.league?.teams.map((t) => ({ teamName: t.teamName, players: t.players, mine: t.rosterId === team.league!.myRosterId })),
-  };
-}
-
-export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]; scoring: Scoring; hasKey: boolean }) {
+export function Assistant({ players, scoring }: { players: PlayerValue[]; scoring: Scoring }) {
   const [team, setTeam, hydrated] = useMyTeam();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const focus = useRef<string[]>([]);
-  const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const weekCache = useRef(new Map<string, Promise<WeekData>>());
   const board = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -95,12 +71,10 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
       if (reply) {
         if (reply.focus.length) focus.current = reply.focus;
         update(() => ({ role: "assistant", content: reply.text, blocks: reply.blocks, suggestions: reply.suggestions }));
-      } else if (hasKey) {
-        await askAi(history, update);
       } else {
         update(() => ({
           role: "assistant",
-          content: "I didn't catch that. I'm built for trade, value and lineup questions, and I answer from the numbers (no AI). Try one of these:",
+          content: `I didn't catch that one. I answer fantasy questions from the numbers, so try one of these, or tap **What can I ask?**`,
           suggestions: shuffle(EXAMPLES).slice(0, 4),
         }));
       }
@@ -111,46 +85,8 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
     }
   }
 
-  /** Anything the built-in rules don't understand goes to Claude, when an API key is set. */
-  async function askAi(history: ChatMessage[], update: (fn: (m: ChatMessage) => ChatMessage) => void) {
-    const ctrl = new AbortController();
-    abort.current = ctrl;
-    update((m) => ({ ...m, ai: true }));
-    try {
-      const res = await fetch("/api/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: ctrl.signal,
-        body: JSON.stringify({ scoring, team: teamPayload(team), messages: history.slice(-8).map((m) => ({ role: m.role, content: m.content || "(see cards)" })) }),
-      });
-      if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error === "missing_key" ? "The AI backup isn't set up." : data.error || "Something went wrong.");
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const evt = JSON.parse(line);
-          if (evt.type === "text") update((m) => ({ ...m, content: m.content + evt.text }));
-          else if (evt.type === "trades") update((m) => ({ ...m, trades: evt.trades }));
-          else if (evt.type === "error") update((m) => ({ ...m, error: evt.error }));
-        }
-      }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") update((m) => ({ ...m, error: (err as Error).message }));
-    } finally {
-      update((m) => ({ ...m, streaming: false, content: m.content.trimEnd() }));
-      abort.current = null;
-    }
-  }
+  const showHelp = () =>
+    setMessages((ms) => [...ms, { role: "assistant", content: HELP_TEXT, suggestions: shuffle(EXAMPLES).slice(0, 4) }]);
 
   const applyLineup = (ids: string[]) => team && setTeam({ ...team, starters: ids });
   const scoringLabel = SCORINGS.find((s) => s.id === scoring)!.label;
@@ -161,7 +97,7 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
       <header className="mb-4 flex animate-rise flex-wrap items-end justify-between gap-3">
         <div>
           <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-rocket">
-            <Zap className="size-3.5" /> Instant answers · no AI needed
+            <Zap className="size-3.5" /> Instant answers · no AI
           </p>
           <h1 className="font-display text-4xl font-extrabold uppercase italic leading-[0.95] sm:text-5xl">
             Trade <span className="text-gradient">Assistant</span>
@@ -180,21 +116,21 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
               {team ? `${team.name} · ${scoringLabel}` : "No team yet: add yours"}
             </Link>
           )}
-          {hasKey && (
-            <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-volt/30 bg-volt/10 px-3 text-xs font-semibold text-volt" title="Questions the assistant doesn't understand are passed to Claude">
-              <Sparkles className="size-3.5" /> AI backup on
-            </span>
-          )}
+          <button
+            onClick={showHelp}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted hover:text-ink"
+          >
+            <HelpCircle className="size-3.5" /> What can I ask?
+          </button>
           {messages.length > 0 && (
             <button
               onClick={() => {
-                abort.current?.abort();
                 setMessages([]);
                 focus.current = [];
               }}
               className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-muted hover:text-ink"
             >
-              <RotateCcw className="size-3.5" /> New chat
+              <RotateCcw className="size-3.5" /> Clear
             </button>
           )}
         </div>
@@ -206,12 +142,12 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
             <motion.div initial={{ scale: 0.6, rotate: -20, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 16 }}>
               <LogoMark className="size-16 shadow-[0_10px_40px_-10px] shadow-rocket/70" />
             </motion.div>
-            <h2 className="mt-5 font-display text-2xl font-bold uppercase">Ask me about any trade</h2>
+            <h2 className="mt-5 font-display text-2xl font-bold uppercase">Ask me anything about fantasy</h2>
             <p className="mt-1 max-w-md text-sm text-muted">
-              I answer instantly from live trade values{team ? `, your roster${team.league ? " and every team in your league" : ""}` : ""} and this week&apos;s projections.
+              Who to start, trades to make, what a player is worth. I answer instantly from live trade values{team ? `, your roster${team.league ? " and every team in your league" : ""}` : ""} and this week&apos;s projections.
             </p>
             <div className="mt-6 grid w-full max-w-2xl grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
-              {[...starters, ...EXAMPLES.filter((e) => /rising|Top 10|Grade|Buy low/.test(e))].slice(0, 8).map((s, i) => (
+              {[...starters, "Make me a trade", ...EXAMPLES.filter((e) => /rising|Top 10|Grade/.test(e))].slice(0, 8).map((s, i) => (
                 <motion.button
                   key={s}
                   initial={{ opacity: 0, y: 8 }}
@@ -254,22 +190,16 @@ export function Assistant({ players, scoring, hasKey }: { players: PlayerValue[]
               }
             }}
             rows={1}
-            placeholder='Try "Walker for Puka?" or "Who should I start?"'
+            autoFocus
+            placeholder="Ask anything about fantasy… (Enter to send)"
             className="max-h-40 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm outline-none [field-sizing:content] placeholder:text-faint"
           />
-          {busy && abort.current ? (
-            <button type="button" onClick={() => abort.current?.abort()} className="grid size-11 shrink-0 place-items-center rounded-xl bg-surface-3 text-ink transition hover:bg-white/10" aria-label="Stop">
-              <Square className="size-4 fill-current" />
-            </button>
-          ) : (
-            <button
-              disabled={!input.trim() || busy}
-              className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-rocket to-flame text-bg transition hover:brightness-110 disabled:opacity-40"
-              aria-label="Send"
-            >
-              <ArrowUp className="size-5" />
-            </button>
-          )}
+          <button
+            disabled={!input.trim() || busy}
+            className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-rocket to-flame px-4 text-sm font-bold text-bg transition hover:brightness-110 disabled:opacity-40"
+          >
+            Send <ArrowUp className="size-4" />
+          </button>
         </div>
       </form>
     </div>
@@ -327,31 +257,11 @@ function Message({
                 />
               ))}
             </span>
-            {m.ai ? "Asking the AI…" : "Crunching the numbers…"}
+            Crunching the numbers…
           </div>
         ) : null}
         {m.error && <p className="rounded-xl bg-down/10 px-3 py-2 text-down">{m.error}</p>}
         {m.blocks?.map((b, i) => <BlockView key={i} b={b} board={board} mine={mine} team={team} onAsk={onAsk} onApply={onApply} />)}
-        <AnimatePresence>
-          {m.trades && m.trades.length > 0 && (
-            <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 2xl:grid-cols-3">
-              {m.trades.map((t, i) => (
-                <TradeIdeaCard
-                  key={i}
-                  index={i}
-                  title={t.title}
-                  subtitle={t.partner ? `with ${t.partner}` : null}
-                  give={t.give}
-                  get={t.get}
-                  board={board}
-                  partnerRosterId={team?.league?.teams.find((x) => x.teamName.toLowerCase() === t.partner?.toLowerCase())?.rosterId}
-                  note={t.why}
-                />
-              ))}
-            </div>
-          )}
-        </AnimatePresence>
-        {m.ai && !m.streaming && <p className="text-[11px] text-faint">Answered by the AI backup.</p>}
         {showSuggestions && m.suggestions && m.suggestions.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {m.suggestions.map((s) => (

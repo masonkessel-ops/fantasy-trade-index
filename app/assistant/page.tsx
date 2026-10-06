@@ -8,5 +8,5 @@ export const metadata: Metadata = { title: "Trade Assistant" };
 export default async function AssistantPage() {
   const scoring = await getScoring();
   const board = await getValueBoard(scoring);
-  return <Assistant players={board.players} scoring={scoring} hasKey={!!process.env.ANTHROPIC_API_KEY} />;
+  return <Assistant players={board.players} scoring={scoring} />;
 }
