@@ -10,7 +10,7 @@
 import { playerRisk, tradeRiskReward } from "../risk";
 import { SLOT_LABEL, analyzeTeam, bestLineup, type PositionStrength } from "../teamAnalysis";
 import { FAIR_PERCENT, evaluateTrade, suggestBalancers } from "../tradeAnalysis";
-import { findOffers, shopPlayers, type FinderIdea, type FinderPool } from "../tradeFinder";
+import { bothWin, findOffers, isWinWin, shopPlayers, type FinderIdea, type FinderPool } from "../tradeFinder";
 import type { SavedTeam } from "../myTeam";
 import type { PlayerValue, Position } from "../types";
 import type { NameIndex, NameMatch } from "./names";
@@ -266,12 +266,12 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
 
   function ideaCard(i: FinderIdea, fallback: string): TradeCardData {
     const pct = Math.round(Math.abs(i.balance) * 100);
-    const notes = [`${signed(i.lineupGain)} to your starting lineup${i.theirGain !== null ? `, ${signed(i.theirGain)} to theirs` : ""}.`];
+    const notes = [`${signed(i.lineupGain)} pts/wk for your lineup${i.theirGain !== null ? `, ${signed(i.theirGain)} for theirs` : ""}.`];
     if (i.rosterChange > 0) notes.push(`You'd drop ${i.rosterChange} bench player${i.rosterChange > 1 ? "s" : ""}.`);
     if (i.theirConcern) notes.push(i.theirConcern);
     return {
       title: i.partner?.teamName ?? fallback,
-      subtitle: pct < 3 ? "Dead-even value" : i.balance > 0 ? `${pct}% in your favor` : `You pay ${pct}% extra`,
+      subtitle: `${isWinWin(i.lineupGain, i.theirGain) ? "Win-win · " : ""}${pct < 3 ? "dead-even value" : i.balance > 0 ? `${pct}% in your favor` : `you pay ${pct}% extra`}`,
       give: i.give,
       get: i.get,
       partnerRosterId: i.partner?.rosterId,
@@ -315,7 +315,7 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
     const seen = new Set<string>();
     const ideas = cands
       .flatMap((c) => findOffers([c], mine, rp, ownerOf(c.id), 2))
-      .sort((a, b) => b.lineupGain - a.lineupGain || b.balance - a.balance)
+      .sort((a, b) => bothWin(b.lineupGain, b.theirGain) - bothWin(a.lineupGain, a.theirGain) || b.balance - a.balance)
       .filter((i) => {
         const k = i.get.join();
         if (seen.has(k)) return false;
@@ -326,7 +326,7 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
     const label = target === "DST" ? "defense" : target;
     const why = wantPos ? "" : ` That's your weakest spot right now.`;
     const text = ideas.length
-      ? `Here are fair trades that upgrade your **${label}**${myBest ? ` (now ${myBest.name}, ${myBest.value})` : ""}, biggest lineup boost first.${why}`
+      ? `Here are fair trades that upgrade your **${label}**${myBest ? ` (now ${myBest.name}, ${myBest.value})` : ""}, deals that help both teams first.${why}`
       : `I couldn't find a fair trade that upgrades your ${label} without leaving a hole in your lineup. Try naming players you'd give up, like "make me a trade with Walker and Rice".`;
     return {
       text,

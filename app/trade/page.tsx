@@ -37,7 +37,7 @@ export default async function TradePage({ searchParams }: PageProps<"/trade">) {
             Trade <span className="text-gradient">Analyzer</span>
           </>
         }
-        subtitle="Add players to each side and get an instant verdict, plus risk vs reward. Values are priced on the real trade market, so stars cost what they really cost: a 100 takes about two 90s or three 85s, and 80 + 80 + 60 falls well short."
+        subtitle="Add players to each side and get an instant verdict, plus risk vs reward. Values are priced on the real trade market, so stars cost what they really cost: a 100 takes about two 90s, and packages of lesser players fall short."
       />
       <TradeAnalyzer
         players={board.players}

@@ -96,6 +96,7 @@ export function TradeAnalyzer({
           accent="var(--color-rocket)"
           players={giveP}
           adjusted={Math.round(result.adjGive)}
+          discount={Math.round(result.discountGive)}
           searchPool={players}
           quickPicks={myRoster}
           picksLabel="Your team"
@@ -115,6 +116,7 @@ export function TradeAnalyzer({
           accent="var(--color-volt)"
           players={getP}
           adjusted={Math.round(result.adjGet)}
+          discount={Math.round(result.discountGet)}
           searchPool={players}
           quickPicks={partnerRoster}
           picksLabel={partnerTeam ? `${partnerTeam.teamName}` : "Their team"}
@@ -231,6 +233,7 @@ function SidePanel({
   accent,
   players,
   adjusted,
+  discount,
   searchPool,
   quickPicks,
   picksLabel,
@@ -244,6 +247,7 @@ function SidePanel({
   accent: string;
   players: PlayerValue[];
   adjusted: number;
+  discount: number;
   searchPool: PlayerValue[];
   quickPicks: PlayerValue[];
   picksLabel: string;
@@ -264,10 +268,15 @@ function SidePanel({
           <p className="text-xs text-muted">{subtitle}</p>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint" title="What the trade market pays for this side. Stars count for much more than their 1–100 value suggests. The side getting fewer players also gets credit for the roster spots it saves.">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint" title="What the trade market pays for this side. Stars count for much more than their 1–100 value suggests, and extra players in a package count for less.">
             Trade weight
           </div>
           <CountUp value={adjusted} className="font-display text-3xl font-bold tabular" />
+          {discount > 0 && (
+            <div className="text-[11px] text-flame tabular" title="Every player after this side's best one fills a lineup spot you could fill from your bench, so he counts for less.">
+              −{discount} package
+            </div>
+          )}
         </div>
       </div>
       <PlayerSearch players={searchPool} exclude={exclude} onSelect={(p) => onAdd(p.id)} placeholder="Add a player…" />
@@ -406,6 +415,11 @@ function VerdictCard({ result, rr }: { result: TradeResult; rr: ReturnType<typeo
               You get <b className="text-ink">{Math.round(result.adjGet)}</b> <span className="text-faint">trade weight</span>
             </span>
           </div>
+          {(result.discountGive > 0 || result.discountGet > 0) && (
+            <p className="mt-2 text-xs leading-relaxed text-faint">
+              Packages count for less: each player after a side&apos;s best one only fills a spot you could fill from your bench, so two good players don&apos;t add up to a great one.
+            </p>
+          )}
         </div>
       </div>
       {rr && (

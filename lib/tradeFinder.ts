@@ -3,33 +3,36 @@
  *  - shopPlayers: "I'd trade away X (and Y) — what can I get?"
  *  - findOffers:  "I want Z — what should I offer?"
  *
- * Fairness uses the same market-calibrated trade weights as the Trade Analyzer.
+ * Fairness uses the same market-calibrated trade weights as the Trade Analyzer,
+ * and every idea stays close to even so the other manager would say yes.
+ * Lineup effects are measured in projected points per week (PlayerValue.weekly).
  * Roster rules, like a real fantasy team:
  *  - a trade can't leave one of your starting slots empty,
- *  - with an imported league, it can't gut the other team's lineup either (they'd never accept),
+ *  - with an imported league, it can't weaken the other team's lineup either (they'd never accept),
  *  - getting more players than you send means dropping someone (flagged on the card).
+ * Ideas that make both lineups better rank first.
  */
 import { tradeRiskReward } from "./risk";
 import { SLOT_LABEL, bestLineup } from "./teamAnalysis";
 import { evaluateTrade } from "./tradeAnalysis";
 import type { PlayerValue } from "./types";
 
-/** Best edge we'll suggest when shopping: stays inside the "fair" band so the other side would accept. */
-export const MAX_EDGE = 0.1;
+/** Best edge we'll suggest: small enough that the other manager still sees a fair deal. */
+export const MAX_EDGE = 0.06;
 /** When shopping a player, don't suggest selling him for less than this (you're the seller). */
 export const MAX_SHOP_DISCOUNT = 0.06;
-/** Edge beyond this doesn't rank an idea higher (a fair deal that fits your lineup beats squeezing them). */
-const EDGE_CREDIT_CAP = 0.05;
 /** Most you should overpay when making an offer for a player you want. */
-export const MAX_OVERPAY = 0.15;
-/** Offers that cost your starting lineup more than this much value are left out. */
-export const MAX_LINEUP_LOSS = 30;
-/** In a league, trades that cost the other team's starting lineup more than this are a tough sell. */
-export const MAX_PARTNER_LOSS = 8;
-/** Ranking cost of each extra player you take back (a roster spot, and a drop). */
-const EXTRA_PLAYER_COST = 4;
-/** How much taking on extra risk (0–1 scale) lowers an idea's ranking. */
-export const RISK_PENALTY = 25;
+export const MAX_OVERPAY = 0.12;
+/** Offers that cost your starting lineup more than this many projected points a week are left out. */
+export const MAX_LINEUP_LOSS = 4;
+/** In a league, a trade that costs the other team's lineup more than this (points a week) is a tough sell. */
+export const MAX_PARTNER_LOSS = 0.5;
+/** Ranking cost (points a week) of each extra player you take back: a roster spot, and a drop. */
+const EXTRA_PLAYER_COST = 0.6;
+/** How much taking on extra risk (0–1 scale) lowers an idea's ranking, in points a week. */
+const RISK_PENALTY = 2.5;
+/** Ranking cost of a lopsided deal (per 100% of edge either way): even deals get accepted. */
+const LOPSIDED_COST = 8;
 
 export interface FinderPool {
   rosterId: number | null;
@@ -41,9 +44,9 @@ export interface FinderIdea {
   give: string[];
   get: string[];
   partner: { rosterId: number | null; teamName: string } | null;
-  /** change in your starting lineup's total value */
+  /** change in your starting lineup's projected points per week */
   lineupGain: number;
-  /** change in the other team's starting lineup (league trades only) */
+  /** change in the other team's starting lineup, points per week (league trades only) */
   theirGain: number | null;
   /** your edge, -1 … 1 (positive = you win) */
   balance: number;
@@ -55,10 +58,32 @@ export interface FinderIdea {
 
 const isFlexPos = (p: PlayerValue) => p.position !== "K" && p.position !== "DST";
 
-function lineup(roster: PlayerValue[], rosterPositions: string[]) {
-  const { starters } = bestLineup(roster, rosterPositions);
+/** Best lineup by projected points a week, its total, and any slots it can't fill. */
+export function lineupPoints(roster: PlayerValue[], rosterPositions: string[]) {
+  const { starters } = bestLineup(roster, rosterPositions, (p) => p.weekly);
   const empty = starters.filter((x) => !x.player).map((x) => SLOT_LABEL[x.slot] ?? x.slot);
-  return { value: starters.reduce((s, x) => s + (x.player?.value ?? 0), 0), empty };
+  return { points: starters.reduce((s, x) => s + (x.player?.weekly ?? 0), 0), empty };
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * A package shouldn't be padded with filler: every player in a multi-player side must be worth
+ * at least a fifth of the deal's best player (and more than a bench body). Otherwise it's really
+ * a smaller trade with a throw-in nobody wants to roster.
+ */
+function hasFiller(give: PlayerValue[], get: PlayerValue[]) {
+  const top = Math.max(...give.map((p) => p.power), ...get.map((p) => p.power));
+  const floor = Math.max(6, 0.2 * top);
+  return [give, get].some((side) => side.length > 1 && side.some((p) => p.power < floor));
+}
+
+/** Both lineups get better: the kind of deal the other manager actually accepts. */
+export const isWinWin = (lineupGain: number, theirGain: number | null) => theirGain !== null && lineupGain > 0 && theirGain > 0;
+
+/** Ranking credit for helping both lineups (points a week): a deal both managers want beats one only you like. */
+export function bothWin(mine: number, theirs: number | null) {
+  return theirs === null ? mine : mine + 0.8 * theirs + Math.min(mine, theirs);
 }
 
 const without = (roster: PlayerValue[], out: PlayerValue[]) => {
@@ -83,20 +108,20 @@ function combos<T>(items: T[], size: number): T[][] {
  * Otherwise they're kept as a concern to show (you asked for a specific player).
  */
 function rosterCheck(give: PlayerValue[], get: PlayerValue[], mine: PlayerValue[], rp: string[], partner: FinderPool | null, strict: boolean) {
-  const before = lineup(mine, rp);
-  const after = lineup([...without(mine, give), ...get], rp);
+  const before = lineupPoints(mine, rp);
+  const after = lineupPoints([...without(mine, give), ...get], rp);
   if (after.empty.length > before.empty.length) return null; // would leave one of your starting slots empty
   let theirGain: number | null = null;
   let theirConcern: string | null = null;
   if (partner && partner.rosterId !== null) {
-    const tb = lineup(partner.roster, rp);
-    const ta = lineup([...without(partner.roster, get), ...give], rp);
-    theirGain = Math.round(ta.value - tb.value);
+    const tb = lineupPoints(partner.roster, rp);
+    const ta = lineupPoints([...without(partner.roster, get), ...give], rp);
+    theirGain = r1(ta.points - tb.points);
     if (ta.empty.length > tb.empty.length) theirConcern = `They'd have no starting ${ta.empty.find((x) => !tb.empty.includes(x)) ?? ta.empty[0]} left, so they'd want one back.`;
     else if (theirGain < -MAX_PARTNER_LOSS) theirConcern = "It weakens their starting lineup, so expect them to ask for a bit more.";
     if (strict && theirConcern) return null;
   }
-  return { lineupGain: Math.round(after.value - before.value), theirGain, theirConcern };
+  return { lineupGain: r1(after.points - before.points), theirGain, theirConcern };
 }
 
 /** `getCount`: only deals where you get back exactly this many players (e.g. 2 for a 1-for-2). */
@@ -118,13 +143,14 @@ export function shopPlayers(give: PlayerValue[], mine: PlayerValue[], pools: Fin
     for (const size of sizes) {
       const top = size === 1 ? cands : cands.slice(0, size === 2 ? (market ? 45 : 18) : market ? 24 : 14);
       for (const get of combos(top, size)) {
+        if (hasFiller(give, get)) continue;
         const t = evaluateTrade(give, get);
         if (t.balance < -MAX_SHOP_DISCOUNT || t.balance > MAX_EDGE) continue;
         const r = rosterCheck(give, get, mine, rosterPositions, pool, true);
         if (!r) continue;
         const risk = tradeRiskReward(give, get)?.riskChange ?? 0;
         const extra = Math.max(0, get.length - give.length);
-        const score = Math.min(t.balance, EDGE_CREDIT_CAP) * 60 + r.lineupGain + 0.4 * (r.theirGain ?? 0) - extra * EXTRA_PLAYER_COST - risk * RISK_PENALTY;
+        const score = bothWin(r.lineupGain, r.theirGain) - Math.abs(t.balance) * LOPSIDED_COST - extra * EXTRA_PLAYER_COST - risk * RISK_PENALTY;
         perPartner.push({
           give: give.map((p) => p.id),
           get: get.map((p) => p.id),
@@ -153,13 +179,16 @@ export function findOffers(target: PlayerValue[], mine: PlayerValue[], rosterPos
   const ideas: (FinderIdea & { score: number })[] = [];
   for (const size of giveCount ? [giveCount] : [1, 2, 3]) {
     for (const give of combos(pool, size)) {
+      if (hasFiller(give, target)) continue;
       const t = evaluateTrade(give, target);
       // They need to see it as fair (or a small win for them); don't overpay a lot.
       if (t.balance > MAX_EDGE || t.balance < -MAX_OVERPAY) continue;
       const r = rosterCheck(give, target, mine, rosterPositions, partner, false);
       if (!r || r.lineupGain < -MAX_LINEUP_LOSS) continue;
       const risk = tradeRiskReward(give, target)?.riskChange ?? 0;
-      const score = r.lineupGain + t.balance * 30 + 0.4 * (r.theirGain ?? 0) - (r.theirConcern ? 10 : 0) - (size - 1) * 2 - risk * RISK_PENALTY;
+      // Overpaying a little is fine (it gets the deal done); squeezing them isn't.
+      const lopsided = Math.abs(t.balance) * LOPSIDED_COST * (t.balance < 0 ? 0.5 : 1);
+      const score = bothWin(r.lineupGain, r.theirGain) - lopsided - (r.theirConcern ? 1.5 : 0) - (size - 1) * 0.3 - risk * RISK_PENALTY;
       ideas.push({
         give: give.map((p) => p.id),
         get: target.map((p) => p.id),
@@ -210,13 +239,13 @@ export function packageDeals(mine: PlayerValue[], pools: FinderPool[], rosterPos
         .slice(0, market ? (shape.get === 1 ? 30 : shape.get === 2 ? 24 : 16) : 16);
       for (const get of combos(local, shape.get)) {
         const getSum = sum(get);
-        if (getSum < giveSum * 0.75 || getSum > giveSum * 1.35) continue; // nowhere near fair
+        if (getSum < giveSum * 0.55 || getSum > giveSum * 1.6 || hasFiller(give, get)) continue; // nowhere near fair, or padded
         const t = evaluateTrade(give, get);
         if (t.balance < -MAX_SHOP_DISCOUNT || t.balance > MAX_EDGE) continue;
         const r = rosterCheck(give, get, mine, rosterPositions, pool, true);
-        if (!r) continue;
+        if (!r || r.lineupGain < 0) continue; // a package should make your lineup better
         const risk = tradeRiskReward(give, get)?.riskChange ?? 0;
-        const score = Math.min(t.balance, EDGE_CREDIT_CAP) * 60 + r.lineupGain + 0.4 * (r.theirGain ?? 0) - risk * RISK_PENALTY;
+        const score = bothWin(r.lineupGain, r.theirGain) - Math.abs(t.balance) * LOPSIDED_COST - risk * RISK_PENALTY;
         perPartner.push({
           give: give.map((p) => p.id),
           get: get.map((p) => p.id),

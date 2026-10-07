@@ -11,7 +11,7 @@ import { TradeIdeaCard } from "@/components/TradeIdeaCard";
 import { usePremiumLock } from "@/lib/account";
 import type { SavedTeam } from "@/lib/myTeam";
 import { analyzeTeam } from "@/lib/teamAnalysis";
-import { findOffers, packageDeals, shopPlayers, type DealShape, type FinderIdea, type FinderPool } from "@/lib/tradeFinder";
+import { findOffers, isWinWin, packageDeals, shopPlayers, type DealShape, type FinderIdea, type FinderPool } from "@/lib/tradeFinder";
 import { POSITIONS, type PlayerValue } from "@/lib/types";
 
 export type FinderMode = "away" | "for" | "package";
@@ -143,7 +143,7 @@ export function TradeFinder({ team, players, initialAway = [], initialWant = [] 
                       : "No fair deals of this type keep both lineups full right now. Try another deal type or position."}
                 </p>
               ) : (
-                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2">
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                   {shown.map((i, n) => (
                     <IdeaCard key={`${i.give.join()}-${i.get.join()}`} idea={i} index={n} board={board} fallbackTitle={mode === "for" ? "Offer" : "Trade idea"} />
                   ))}
@@ -405,7 +405,7 @@ function IdeaCard({ idea: i, index, board, fallbackTitle }: { idea: FinderIdea; 
     <TradeIdeaCard
       index={index}
       title={i.partner ? i.partner.teamName : fallbackTitle}
-      subtitle={pct < 3 ? "Dead-even value" : i.balance > 0 ? `${pct}% in your favor` : `You pay ${pct}% extra`}
+      subtitle={`${isWinWin(i.lineupGain, i.theirGain) ? "Win-win · " : ""}${pct < 3 ? "dead-even value" : i.balance > 0 ? `${pct}% in your favor` : `you pay ${pct}% extra`}`}
       give={i.give}
       get={i.get}
       board={board}
@@ -413,10 +413,10 @@ function IdeaCard({ idea: i, index, board, fallbackTitle }: { idea: FinderIdea; 
       note={
         <span className="flex flex-col gap-0.5">
           <span>
-            <b className={i.lineupGain >= 0 ? "text-up" : "text-flame"}>{signed(i.lineupGain)}</b> to your starting lineup
+            <b className={i.lineupGain >= 0 ? "text-up" : "text-flame"}>{signed(i.lineupGain)}</b> pts/wk for your lineup
             {i.theirGain !== null && (
               <>
-                , <b className={i.theirGain >= 0 ? "text-up" : "text-muted"}>{signed(i.theirGain)}</b> to theirs
+                , <b className={i.theirGain >= 0 ? "text-up" : "text-muted"}>{signed(i.theirGain)}</b> for theirs
               </>
             )}
           </span>

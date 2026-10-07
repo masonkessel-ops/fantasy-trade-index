@@ -2,16 +2,16 @@ import "server-only";
 import { REGULAR_SEASON_WEEKS, getNflState, getScores, getWeekProjections, getWeekStats } from "./sleeper";
 import { bestLineup } from "./teamAnalysis";
 import { evaluateTrade } from "./tradeAnalysis";
-import { MAX_EDGE, MAX_SHOP_DISCOUNT } from "./tradeFinder";
+import { MAX_EDGE, MAX_PARTNER_LOSS, MAX_SHOP_DISCOUNT, lineupPoints } from "./tradeFinder";
 import { getValueBoard } from "./values";
 import type { PlayerValue, Position, Scoring } from "./types";
 
 /* ============================== KNOBS ==================================== */
 
-/** A trade must improve your starting lineup's total value by at least this much. */
+/** A waiver add must improve your starting lineup's total value by at least this much. */
 export const MIN_LINEUP_GAIN = 2;
-/** …and can't hurt the other team's starters by more than this (keeps offers realistic). */
-export const MAX_PARTNER_LOSS = 5;
+/** A trade must add at least this many projected points a week to your lineup (and can't cost theirs more than MAX_PARTNER_LOSS). */
+export const MIN_TRADE_GAIN = 0.5;
 /** How many of each roster's most valuable players the trade finder considers. */
 const TRADE_POOL = 15;
 /** Waiver adds must beat the player you'd drop by this many value points. */
@@ -60,6 +60,7 @@ export interface TradeIdea {
   partner: { rosterId: number | null; teamName: string };
   give: string[];
   get: string[];
+  /** projected points a week each lineup gains */
   myGain: number;
   theirGain: number | null;
   diff: number;
@@ -93,19 +94,21 @@ function combos<T>(items: T[], size: 1 | 2): T[][] {
   return out;
 }
 
-/** Find fair trades that upgrade your starting lineup (and don't gut theirs). */
+const lineupPts = (roster: PlayerValue[], rosterPositions: string[]) => lineupPoints(roster, rosterPositions).points;
+
+/** Find fair trades that upgrade your starting lineup without weakening theirs; win-wins first. */
 function findTrades(
   mine: PlayerValue[],
   partners: { rosterId: number | null; teamName: string; roster: PlayerValue[] }[],
   rosterPositions: string[],
   marketMode: boolean,
 ): TradeIdea[] {
-  const baseMe = starterValue(mine, rosterPositions);
+  const baseMe = lineupPts(mine, rosterPositions);
   const gives = [...mine].filter(skill).sort((a, b) => b.value - a.value).slice(0, TRADE_POOL);
   const ideas: (TradeIdea & { score: number })[] = [];
 
   for (const partner of partners) {
-    const baseThem = marketMode ? 0 : starterValue(partner.roster, rosterPositions);
+    const baseThem = marketMode ? 0 : lineupPts(partner.roster, rosterPositions);
     const gets = [...partner.roster].filter(skill).sort((a, b) => b.value - a.value).slice(0, marketMode ? 80 : TRADE_POOL);
     const best: (TradeIdea & { score: number })[] = [];
 
@@ -117,20 +120,22 @@ function findTrades(
           if (t.balance < -MAX_SHOP_DISCOUNT || t.balance > MAX_EDGE) continue;
           const giveIds = new Set(give.map((p) => p.id));
           const getIds = new Set(get.map((p) => p.id));
-          const myGain = starterValue([...mine.filter((p) => !giveIds.has(p.id)), ...get], rosterPositions) - baseMe;
-          if (myGain < MIN_LINEUP_GAIN) continue;
+          const myGain = lineupPts([...mine.filter((p) => !giveIds.has(p.id)), ...get], rosterPositions) - baseMe;
+          if (myGain < MIN_TRADE_GAIN) continue;
           let theirGain: number | null = null;
           if (!marketMode) {
-            theirGain = starterValue([...partner.roster.filter((p) => !getIds.has(p.id)), ...give], rosterPositions) - baseThem;
+            theirGain = lineupPts([...partner.roster.filter((p) => !getIds.has(p.id)), ...give], rosterPositions) - baseThem;
             if (theirGain < -MAX_PARTNER_LOSS) continue;
           }
-          const score = myGain + 0.6 * (theirGain ?? 0) - 0.25 * Math.abs(t.diff) - (give.length + get.length - 2) * 1.5;
+          // Deals both managers want come first: credit their gain, and the smaller of the two gains again.
+          const mutual = theirGain === null ? 0 : 0.8 * theirGain + Math.min(myGain, theirGain);
+          const score = myGain + mutual - 8 * Math.abs(t.balance) - (give.length + get.length - 2) * 0.3;
           best.push({
             partner: { rosterId: partner.rosterId, teamName: partner.teamName },
             give: give.map((p) => p.id),
             get: get.map((p) => p.id),
-            myGain: Math.round(myGain),
-            theirGain: theirGain === null ? null : Math.round(theirGain),
+            myGain: r1(myGain),
+            theirGain: theirGain === null ? null : r1(theirGain),
             diff: t.diff,
             score,
           });

@@ -9,9 +9,16 @@ import {
   getPlayers,
   getSchedule,
 } from "./sleeper";
-import { FORMULA_KEY, MARKET_WEIGHT, computeTradeValues, fromShare, type ValueInput } from "./tradeValue";
+import { FORMULA_KEY, MARKET_WEIGHT, computeTradeValues, fromShare, marketInjury, type ValueInput } from "./tradeValue";
 import { getMarketValues, type MarketValue } from "./market";
 import type { Player, PlayerValue, Position, Scoring, ValueBoard, WeekLine } from "./types";
+
+/**
+ * Share of a player's projected weekly points to count for lineup math, by
+ * injury status (projections already skip known missed games; this covers the
+ * chance he misses more).
+ */
+const LINEUP_INJURY: Record<string, number> = { Questionable: 0.97, Doubtful: 0.9, Out: 0.9, Sus: 0.9, IR: 0.8, PUP: 0.8, NA: 0.8 };
 
 /** How many players per position appear on the trade value chart. */
 const MAX_LISTED: Record<Position, number> = { QB: 40, RB: 80, WR: 100, TE: 40, K: 32, DST: 32 };
@@ -83,6 +90,7 @@ function buildInputs(
       recentPpg: recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : null,
       rosPpg: rosGames ? rosPoints / rosGames : 0,
       rosGames,
+      rosWeeks: Math.max(0, REGULAR_SEASON_WEEKS - firstRosWeek + 1),
       byeWeek: p.team ? (data.byes[p.team] ?? null) : null,
     };
   });
@@ -97,16 +105,19 @@ export function getValueBoard(scoring: Scoring): Promise<ValueBoard> {
 /**
  * Blend model shares with market shares (see MARKET_WEIGHT) and rescale so the
  * best player is 100. Players the market doesn't list are worth ~0 there.
+ * Today's injuries also trim the market price (see MARKET_INJURY_SHARE).
  */
 function blendWithMarket(
   results: ReturnType<typeof computeTradeValues>,
   market: Map<string, MarketValue>,
   data: SeasonData,
+  isLatest: boolean,
 ): ReturnType<typeof computeTradeValues> {
   if (!market.size || MARKET_WEIGHT <= 0) return results;
   const blended = results.map((r) => {
-    const pos = data.players[r.id].position;
-    const share = pos === "K" || pos === "DST" ? r.share * (1 - MARKET_WEIGHT * 0.5) : (1 - MARKET_WEIGHT) * r.share + MARKET_WEIGHT * (market.get(r.id)?.share ?? 0);
+    const p = data.players[r.id];
+    const marketShare = (market.get(r.id)?.share ?? 0) * (isLatest ? marketInjury(p.injuryStatus) : 1);
+    const share = p.position === "K" || p.position === "DST" ? r.share * (1 - MARKET_WEIGHT * 0.5) : (1 - MARKET_WEIGHT) * r.share + MARKET_WEIGHT * marketShare;
     return { r, share };
   });
   const top = Math.max(1e-9, ...blended.map((b) => b.share));
@@ -127,7 +138,7 @@ async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
   let latest: ReturnType<typeof computeTradeValues> = [];
   for (let w = 1; w <= week; w++) {
     const isLatest = w === week;
-    const results = blendWithMarket(computeTradeValues(buildInputs(data, ids, scoring, w, isLatest), w), market, data);
+    const results = blendWithMarket(computeTradeValues(buildInputs(data, ids, scoring, w, isLatest), w), market, data, isLatest);
     for (const r of results) {
       if (!history.has(r.id)) history.set(r.id, Array(week).fill(null));
       history.get(r.id)![w - 1] = r.value;
@@ -181,6 +192,7 @@ async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
       recentPpg: input.recentPpg === null ? null : round1(input.recentPpg),
       rosPpg: round1(input.rosPpg),
       rosPoints: Math.round(input.rosPpg * input.rosGames),
+      weekly: input.rosWeeks ? round1(((input.rosPpg * input.rosGames) / input.rosWeeks) * ((p.injuryStatus && LINEUP_INJURY[p.injuryStatus]) || 1)) : 0,
       byeWeek: input.byeWeek,
       trend,
       weekPoints: data.stats.map((w) => (w[r.id]?.played ? round1(w[r.id].pts[scoring]) : null)),

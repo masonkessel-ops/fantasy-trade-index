@@ -94,7 +94,7 @@ function Side({ label, players, total, color }: { label: string; players: Player
     <div className="rounded-xl bg-white/[0.03] p-2.5">
       <div className="mb-1.5 flex items-baseline justify-between px-0.5">
         <span className={clsx("text-[10px] font-bold uppercase tracking-wider", color)}>{label}</span>
-        <span className="text-xs text-muted tabular" title="Trade weight: what the market pays for this side (stars count for more than their 1–100 value)">
+        <span className="text-xs text-muted tabular" title="Trade weight: what the market pays for this side. Stars count for more than their 1–100 value, and extra players in a package count for less.">
           <b className="font-display text-sm text-ink">{total}</b> wt
         </span>
       </div>

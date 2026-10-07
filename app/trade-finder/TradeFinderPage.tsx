@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, Scale, Users } from "lucide-react";
 import { useMyTeam } from "@/lib/myTeam";
-import { FAIR_PERCENT } from "@/lib/tradeAnalysis";
+import { MAX_EDGE } from "@/lib/tradeFinder";
 import { MARKET_WEIGHT } from "@/lib/tradeValue";
 import type { PlayerValue } from "@/lib/types";
 import { TradeFinder } from "./TradeFinder";
@@ -60,10 +60,10 @@ export function TradeFinderPage({ players, initialAway, initialWant }: { players
         </summary>
         <p className="mt-3">
           Each player&apos;s value is {Math.round(MARKET_WEIGHT * 100)}% real trade-market price (from thousands of actual fantasy trades on FantasyCalc) and{" "}
-          {Math.round((1 - MARKET_WEIGHT) * 100)}% our live stats model. Trades are weighed on that market scale, so stars cost what they really cost: two mid-level players
-          don&apos;t add up to one elite one. The <b className="text-ink">wt</b> totals on each card are that market weight (a 97 is worth far more than a 74, so 97 + 74 is
-          about even with a 100). A trade counts as fair when the sides are within {Math.round(FAIR_PERCENT * 100)}%. Lineup numbers show how each side&apos;s best starting
-          lineup changes.
+          {Math.round((1 - MARKET_WEIGHT) * 100)}% our live stats model, trimmed for injuries. Packages count for less than their sum: every player after a side&apos;s
+          best one only fills a spot you could fill from your bench, so two mid-level players don&apos;t buy an elite one. The <b className="text-ink">wt</b> totals on each
+          card already include that. Every idea is within {Math.round(MAX_EDGE * 100)}% of even, so the other manager has a reason to say yes, and in an imported league
+          it can&apos;t weaken their lineup. Lineup numbers are projected points a week; <b className="text-ink">Win-win</b> deals improve both lineups and come first.
         </p>
       </details>
     </div>

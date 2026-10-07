@@ -3,22 +3,34 @@
  *
  * Trades are judged on each player's trade weight ("power"): his share of the
  * best player's worth, blended with real trade-market values (lib/market.ts).
- * That scale is linear like the market's prices, which already carry the star
- * premium (Gibbs at 100 is worth about two players at 54 each), so sides are
- * simply added up. The only adjustment is FantasyCalc's: the side that receives
- * fewer players frees roster spots, worth a waiver pickup each (ROSTER_SPOT_VALUE).
+ *
+ * Packages count for less than their sum. A side's best player counts in full;
+ * every other player on that side only fills a lineup spot you could otherwise
+ * fill from your bench, so he counts for his weight minus a bench player's
+ * (PACKAGE_SPOT_COST, plus PACKAGE_STAR_COST × the best player in the deal: the
+ * better the star, the more it takes to pry him loose). That's why two good
+ * players don't add up to a great one, and a throw-in barely moves a deal.
  */
 import type { PlayerValue } from "./types";
 
-/**
- * What one open roster spot is worth in trade weight: about a waiver-wire pickup
- * (players ranked ~150–180 are worth 2–4). The side receiving fewer players gets
- * this for every spot it saves.
- */
-export const ROSTER_SPOT_VALUE = 3;
+/** Lineup-spot charge for every player after a side's best one, in trade weight (about a bench starter). */
+export const PACKAGE_SPOT_COST = 6;
+/** Extra charge per extra player, as a share of the best player's weight in the whole trade (the star premium). */
+export const PACKAGE_STAR_COST = 0.08;
+/** An extra player never loses more than this share of his own weight (so throw-ins still count a little). */
+export const PACKAGE_MAX_DISCOUNT = 0.75;
+
+/** What a side is worth in a trade: the full weight of its best player plus the discounted rest. */
+export function packageWeight(players: PlayerValue[], top: number) {
+  const sorted = [...players].sort((a, b) => b.power - a.power);
+  const raw = sorted.reduce((s, p) => s + p.power, 0);
+  const charge = PACKAGE_SPOT_COST + PACKAGE_STAR_COST * top;
+  const discount = sorted.slice(1).reduce((s, p) => s + Math.min(PACKAGE_MAX_DISCOUNT * p.power, charge), 0);
+  return { raw, discount, total: raw - discount };
+}
 
 /** A trade is "fair" when sides are within this share of the bigger side's power… */
-export const FAIR_PERCENT = 0.12;
+export const FAIR_PERCENT = 0.08;
 /** …or within this many power points (keeps low-value swaps from flip-flopping). */
 export const FAIR_ABSOLUTE = 2;
 
@@ -28,9 +40,12 @@ export interface TradeResult {
   /** sum of displayed values on each side (what users see) */
   rawGive: number;
   rawGet: number;
-  /** trade weight on each side, including the roster-spot credit (what the verdict uses) */
+  /** trade weight on each side after the package discount (what the verdict uses) */
   adjGive: number;
   adjGet: number;
+  /** how much the package discount took off each side (0 for a single player) */
+  discountGive: number;
+  discountGet: number;
   /** adjGet - adjGive in power points: positive = you win */
   diff: number;
   /** -1 … 1, your edge as a share of the bigger side (drives the meter) */
@@ -41,10 +56,12 @@ export interface TradeResult {
 export function evaluateTrade(give: PlayerValue[], get: PlayerValue[]): TradeResult {
   const rawGive = give.reduce((s, p) => s + p.value, 0);
   const rawGet = get.reduce((s, p) => s + p.value, 0);
-  const sum = (ps: PlayerValue[]) => ps.reduce((s, p) => s + p.power, 0);
-  // Getting fewer players than you send frees roster spots for waiver pickups (and vice versa).
-  const adjGive = Math.round((sum(give) + Math.max(0, get.length - give.length) * ROSTER_SPOT_VALUE) * 10) / 10;
-  const adjGet = Math.round((sum(get) + Math.max(0, give.length - get.length) * ROSTER_SPOT_VALUE) * 10) / 10;
+  const top = Math.max(0, ...give.map((p) => p.power), ...get.map((p) => p.power));
+  const g = packageWeight(give, top);
+  const t = packageWeight(get, top);
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const adjGive = r1(g.total);
+  const adjGet = r1(t.total);
   const diff = Math.round((adjGet - adjGive) * 10) / 10;
   const bigger = Math.max(adjGive, adjGet, 0.1);
   const balance = Math.max(-1, Math.min(1, diff / bigger));
@@ -52,7 +69,7 @@ export function evaluateTrade(give: PlayerValue[], get: PlayerValue[]): TradeRes
   if (!give.length || !get.length) verdict = "empty";
   else if (Math.abs(balance) <= FAIR_PERCENT || Math.abs(diff) <= FAIR_ABSOLUTE) verdict = "fair";
   else verdict = diff > 0 ? "win" : "lose";
-  return { rawGive, rawGet, adjGive, adjGet, diff, balance, verdict };
+  return { rawGive, rawGet, adjGive, adjGet, discountGive: r1(g.discount), discountGet: r1(t.discount), diff, balance, verdict };
 }
 
 /** Letter grade for your side of a trade, from your edge (-1 … 1). B+ = dead even. */

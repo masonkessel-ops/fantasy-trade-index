@@ -28,7 +28,8 @@
  *  3. INJURY multiplier on top (Out = 0.65×, IR = 0.4×, …), and a discount
  *     for streamable positions (K, DST).
  *
- *  4. Blended with real trade-market values (MARKET_WEIGHT), then the best
+ *  4. Blended with real trade-market values (MARKET_WEIGHT, with part of the
+ *     injury discount applied to the market price too), then the best
  *     player is 100. Displayed values use a compressed scale
  *     (DISPLAY_CURVE) so good players sit in the 70s–90s and ties are common.
  *     Each player also gets a linear "trade power" (0–100, proportional to
@@ -154,10 +155,24 @@ export const DISPLAY_CURVE = 0.17;
  */
 export const MARKET_WEIGHT = 0.6;
 
+/**
+ * Share of the injury discount (INJURY_MULTIPLIER) that also applies to the
+ * market's price. The market reacts slowly to injury news, so an injured player
+ * shouldn't keep his full market price: with 0.6, an Out player keeps ~79% of
+ * it, an IR player ~64%, a Questionable one ~96%.
+ */
+export const MARKET_INJURY_SHARE = 0.6;
+
+/** Multiplier for a player's market price given his injury status (1 = healthy). */
+export function marketInjury(status: string | null) {
+  const m = (status && INJURY_MULTIPLIER[status]) || 1;
+  return 1 - (1 - m) * MARKET_INJURY_SHARE;
+}
+
 /** Changes whenever a knob above changes, so cached values refresh immediately. */
 export const FORMULA_KEY = JSON.stringify([
   WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, DISPLAY_CURVE, MARKET_WEIGHT,
-  STREAMABLE_DISCOUNT, DEPTH_CREDIT,
+  STREAMABLE_DISCOUNT, DEPTH_CREDIT, MARKET_INJURY_SHARE,
   byeScore.toString(),
 ]);
 
@@ -177,6 +192,8 @@ export interface ValueInput {
   rosPpg: number;
   /** projected remaining games */
   rosGames: number;
+  /** regular-season weeks left for him, byes included (for points per week) */
+  rosWeeks: number;
   byeWeek: number | null;
 }
 

@@ -75,6 +75,8 @@ export interface PlayerValue {
   recentPpg: number | null;
   rosPpg: number;
   rosPoints: number;
+  /** projected points per remaining week for a lineup (counts byes, missed games and current injuries) */
+  weekly: number;
   byeWeek: number | null;
   /** trade value after each week of the season (index 0 = week 1) */
   trend: (number | null)[];

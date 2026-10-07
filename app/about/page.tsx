@@ -16,7 +16,7 @@ const FAQ: [string, React.ReactNode][] = [
     "Why is a 97 worth so much more than a 74?",
     <>
       The 1–100 scale is compressed so good starters all land in the 70s–90s. Trades are judged on <b>trade weight</b>, which follows real trade prices: an elite
-      player is worth several mid-level starters, so 97 + 74 is about even with a 100, and 80 + 80 + 60 is well short.
+      player is worth several mid-level starters. A 100 takes about two 90s, while 97 + 74 or three 85s still fall short.
     </>,
   ],
   ["Which formats do the values fit?", "Redraft, 12-team, one-QB leagues, in PPR, half-PPR or standard scoring (pick it in the sidebar). Dynasty and superflex values aren't supported yet."],
@@ -53,17 +53,18 @@ export default function AboutPage() {
 
         <h2>Judging a trade</h2>
         <p>
-          Trades are weighed on <b>trade weight</b>: each player&apos;s share of the top player&apos;s market price. Market prices already carry the star premium, so
-          each side is simply added up, plus a small credit (a waiver pickup&apos;s worth) for every roster spot the side getting fewer players saves. That&apos;s
-          the same approach FantasyCalc uses. A trade is <b>fair</b> when the two sides are within{" "}
-          {Math.round(FAIR_PERCENT * 100)}%. Every trade also gets a letter grade, a risk-vs-reward rating (injuries, age, boom-or-bust weeks) and, with your team
-          imported, the change to your starting lineup.
+          Trades are weighed on <b>trade weight</b>: each player&apos;s share of the top player&apos;s market price, trimmed for injuries. Packages count for less than
+          their sum: each side&apos;s best player counts in full, and every other player only fills a lineup spot you could fill from your bench, so he counts for his
+          weight minus a bench player&apos;s (more when a star is in the deal). That&apos;s why two good players don&apos;t buy a great one, and why a 2-for-1 or 3-for-1
+          has to give more than it looks like. A trade is <b>fair</b> when the two sides are within {Math.round(FAIR_PERCENT * 100)}%. Every trade also gets a letter
+          grade, a risk-vs-reward rating (injuries, age, boom-or-bust weeks) and, with your team imported, the change to your starting lineup in projected points a week.
         </p>
 
         <h2>Finding trades</h2>
         <p>
-          The <Link href="/trade-finder">trade finder</Link> only suggests deals that are fair, keep every one of your starting spots filled, and, in an imported league,
-          don&apos;t gut the other team&apos;s lineup. Cards tell you when you&apos;d need to drop someone.
+          The <Link href="/trade-finder">trade finder</Link> only suggests deals that are close to even, keep every one of your starting spots filled, and, in an imported
+          league, don&apos;t weaken the other team&apos;s lineup, so the other manager has a reason to say yes. Deals that make both lineups better (marked{" "}
+          <b>Win-win</b>) come first. Cards tell you when you&apos;d need to drop someone.
         </p>
 
         <h2>Auto lineup</h2>

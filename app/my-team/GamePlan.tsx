@@ -81,7 +81,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
             </h2>
             <p className="text-xs text-muted">
               {advice.hasLeague
-                ? "Fair trades with teams in your league that upgrade your lineup without gutting theirs."
+                ? "Fair trades with teams in your league that upgrade your lineup without weakening theirs. Win-wins first."
                 : "Fair trades that upgrade your starting lineup. Import your league to target real rosters."}
             </p>
           </div>
@@ -109,7 +109,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
                 key={i}
                 index={i}
                 title={t.partner.teamName}
-                subtitle={t.theirGain !== null ? (t.theirGain >= 0 ? "Helps both lineups" : "They may need convincing") : null}
+                subtitle={t.theirGain !== null ? (t.theirGain > 0 ? "Win-win: both lineups get better" : "Fair value, their lineup barely changes") : null}
                 give={t.give}
                 get={t.get}
                 board={board}
@@ -118,7 +118,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="size-3.5 text-up" />
                     <span>
-                      <b className="text-up">+{t.myGain}</b> to your lineup
+                      <b className="text-up">+{t.myGain}</b> pts/wk for your lineup
                       {t.theirGain !== null && (
                         <>
                           {" · "}
@@ -126,7 +126,7 @@ export function GamePlan({ team, players, scoring }: { team: SavedTeam; players:
                             {t.theirGain >= 0 ? "+" : ""}
                             {t.theirGain}
                           </span>{" "}
-                          to theirs
+                          for theirs
                         </>
                       )}
                     </span>
