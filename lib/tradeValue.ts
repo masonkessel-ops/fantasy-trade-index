@@ -11,7 +11,12 @@
  *       seasonPpg     – fantasy points per game this season, regressed toward
  *                       the projection when a player has only a few games
  *       recentForm    – points per game over the last 3 weeks played
- *       restOfSeason  – projected points over replacement for the rest of the season
+ *       opportunity   – expected points per game from his usage (targets,
+ *                       carries, pass attempts over his last 4 games, priced at
+ *                       what that usage scores league-wide): a starter who
+ *                       gets the ball is worth more than one hot week suggests
+ *       restOfSeason  – projected points over replacement for the rest of the
+ *                       season (average of Sleeper's and ESPN's projections)
  *       scarcity      – how hard the player is to replace at his position
  *
  *     Points are measured *over replacement level* (the Nth-best player at the
@@ -21,6 +26,8 @@
  *  2. MODIFIER factors (scored 0–1) that can only shave value off:
  *       age           – distance past the position's age peak
  *       byeWeek       – an upcoming bye costs you a week of production
+ *       role          – is he his team's starter? Depth chart spot, snap share
+ *                       and how many ESPN managers start him
  *
  *     A player who scores 0 on a modifier loses exactly that modifier's weight,
  *     e.g. an old RB (age score 0) loses 10% of his value with age = 0.10.
@@ -28,8 +35,9 @@
  *  3. INJURY multiplier on top (Out = 0.65×, IR = 0.4×, …), and a discount
  *     for streamable positions (K, DST).
  *
- *  4. Blended with real trade-market values (MARKET_WEIGHT, with part of the
- *     injury discount applied to the market price too), then the best
+ *  4. Blended with real trade-market values (marketWeight(week): the market
+ *     leads early in the season and production takes over as weeks pass, with
+ *     part of the injury discount applied to the market price too), then the best
  *     player is 100. Displayed values use a compressed scale
  *     (DISPLAY_CURVE) so good players sit in the 70s–90s and ties are common.
  *     Each player also gets a linear "trade power" (0–100, proportional to
@@ -44,14 +52,26 @@ import type { Position } from "./types";
 /** Factor weights. They should add up to 1.0. */
 export const WEIGHTS = {
   // production
-  seasonPpg: 0.3,
-  recentForm: 0.15,
-  restOfSeason: 0.25,
-  scarcity: 0.15,
+  seasonPpg: 0.14,
+  recentForm: 0.12,
+  opportunity: 0.14,
+  restOfSeason: 0.32,
+  scarcity: 0.1,
   // modifiers
-  age: 0.1,
-  byeWeek: 0.05,
+  age: 0.08,
+  byeWeek: 0.04,
+  role: 0.06,
 } as const;
+
+/** Role score by depth chart order (1 = starter). Backup QBs barely play, so they drop further. */
+export function depthScore(position: Position, order: number | null) {
+  if (order === null) return 0.6;
+  if (position === "QB") return order === 1 ? 1 : 0.15;
+  return order === 1 ? 1 : order === 2 ? 0.55 : order === 3 ? 0.3 : 0.15;
+}
+
+/** Snap share that counts as a full-time role, by position (RBs rotate more than WRs). */
+export const FULL_SNAP_SHARE: Record<Position, number> = { QB: 0.9, RB: 0.6, WR: 0.82, TE: 0.75, K: 1, DST: 1 };
 
 /**
  * Replacement level = the player at this rank at each position. Points above
@@ -154,6 +174,15 @@ export const DISPLAY_CURVE = 0.17;
  * the model because the market doesn't price them.
  */
 export const MARKET_WEIGHT = 0.6;
+/** …falling by this much per week of the season… */
+export const MARKET_WEIGHT_STEP = 0.025;
+/** …to this floor, as this season's production and usage become the better guide. */
+export const MARKET_WEIGHT_MIN = 0.35;
+
+/** Market share of a player's value after `week` weeks (0.6 in week 1, 0.5 by week 5, 0.35 from week 11). */
+export function marketWeight(week: number) {
+  return Math.max(MARKET_WEIGHT_MIN, MARKET_WEIGHT - MARKET_WEIGHT_STEP * Math.max(0, week - 1));
+}
 
 /**
  * Share of the injury discount (INJURY_MULTIPLIER) that also applies to the
@@ -172,8 +201,8 @@ export function marketInjury(status: string | null) {
 /** Changes whenever a knob above changes, so cached values refresh immediately. */
 export const FORMULA_KEY = JSON.stringify([
   WEIGHTS, REPLACEMENT_RANK, POSITION_SCARCITY, AGE_CURVE, INJURY_MULTIPLIER, PROJECTION_PRIOR_GAMES, DISPLAY_CURVE, MARKET_WEIGHT,
-  STREAMABLE_DISCOUNT, DEPTH_CREDIT, MARKET_INJURY_SHARE,
-  byeScore.toString(),
+  STREAMABLE_DISCOUNT, DEPTH_CREDIT, MARKET_INJURY_SHARE, MARKET_WEIGHT_STEP, MARKET_WEIGHT_MIN, FULL_SNAP_SHARE,
+  byeScore.toString(), depthScore.toString(),
 ]);
 
 /* ============================ ENGINE ===================================== */
@@ -194,6 +223,12 @@ export interface ValueInput {
   rosGames: number;
   /** regular-season weeks left for him, byes included (for points per week) */
   rosWeeks: number;
+  /** expected points per game from usage over his last few games (null = no games yet) */
+  xfpPpg: number | null;
+  /** games behind xfpPpg */
+  xfpGames: number;
+  /** 0–1: depth chart, snap share and ESPN start rate combined (see depthScore) */
+  role: number;
   byeWeek: number | null;
 }
 
@@ -210,7 +245,7 @@ export interface ValueResult {
   breakdown: Record<keyof typeof WEIGHTS | "injury", number>;
 }
 
-const PRODUCTION_KEYS = ["seasonPpg", "recentForm", "restOfSeason", "scarcity"] as const;
+const PRODUCTION_KEYS = ["seasonPpg", "recentForm", "opportunity", "restOfSeason", "scarcity"] as const;
 
 /** Points over replacement, with a small tapering credit below replacement. */
 function overReplacement(x: number, repl: number) {
@@ -238,10 +273,14 @@ export function computeTradeValues(inputs: ValueInput[], currentWeek: number): V
     const blendedPpg =
       (p.seasonPpg * p.gamesPlayed + p.rosPpg * PROJECTION_PRIOR_GAMES) /
       (p.gamesPlayed + PROJECTION_PRIOR_GAMES);
+    // Usage, regressed toward the projection the same way (few games = lean on the projection).
+    const opportunity =
+      p.xfpPpg === null ? p.rosPpg : (p.xfpPpg * p.xfpGames + p.rosPpg * PROJECTION_PRIOR_GAMES) / (p.xfpGames + PROJECTION_PRIOR_GAMES);
     return {
       p,
       season: blendedPpg,
       recent: p.recentPpg ?? blendedPpg,
+      opportunity,
       rosPpg: p.rosPpg,
     };
   });
@@ -252,12 +291,13 @@ export function computeTradeValues(inputs: ValueInput[], currentWeek: number): V
     if (!byPos.has(m.p.position)) byPos.set(m.p.position, []);
     byPos.get(m.p.position)!.push(m);
   }
-  const repl = new Map<Position, { season: number; recent: number; ros: number }>();
+  const repl = new Map<Position, { season: number; recent: number; opportunity: number; ros: number }>();
   for (const [pos, list] of byPos) {
     const r = REPLACEMENT_RANK[pos];
     repl.set(pos, {
       season: replacementLevel(list.map((m) => m.season), r),
       recent: replacementLevel(list.map((m) => m.recent), r),
+      opportunity: replacementLevel(list.map((m) => m.opportunity), r),
       ros: replacementLevel(list.map((m) => m.rosPpg), r),
     });
   }
@@ -269,16 +309,18 @@ export function computeTradeValues(inputs: ValueInput[], currentWeek: number): V
       ...m,
       vSeason: overReplacement(m.season, r.season),
       vRecent: overReplacement(m.recent, r.recent),
+      vOpp: overReplacement(m.opportunity, r.opportunity),
       vRos: overReplacement(m.rosPpg, r.ros) * m.p.rosGames,
     };
   });
-  const maxOf = (k: "vSeason" | "vRecent" | "vRos") => Math.max(1e-9, ...vor.map((v) => v[k]));
-  const max = { season: maxOf("vSeason"), recent: maxOf("vRecent"), ros: maxOf("vRos") };
+  const maxOf = (k: "vSeason" | "vRecent" | "vOpp" | "vRos") => Math.max(1e-9, ...vor.map((v) => v[k]));
+  const max = { season: maxOf("vSeason"), recent: maxOf("vRecent"), opp: maxOf("vOpp"), ros: maxOf("vRos") };
 
   // 4. Positional rank on combined production (used for scarcity).
   const prodScore = (v: (typeof vor)[number]) =>
     WEIGHTS.seasonPpg * (v.vSeason / max.season) +
     WEIGHTS.recentForm * (v.vRecent / max.recent) +
+    WEIGHTS.opportunity * (v.vOpp / max.opp) +
     WEIGHTS.restOfSeason * (v.vRos / max.ros) +
     // tie-breaker so players below replacement level still rank sensibly
     1e-4 * (v.season + v.rosPpg);
@@ -298,13 +340,15 @@ export function computeTradeValues(inputs: ValueInput[], currentWeek: number): V
     const scores = {
       seasonPpg: v.vSeason / max.season,
       recentForm: v.vRecent / max.recent,
+      opportunity: v.vOpp / max.opp,
       restOfSeason: v.vRos / max.ros,
       scarcity: POSITION_SCARCITY[v.p.position] * tier,
       age: ageScore(v.p.position, v.p.age),
       byeWeek: byeScore(v.p.byeWeek, currentWeek),
+      role: v.p.role,
     };
     const production = PRODUCTION_KEYS.reduce((s, k) => s + WEIGHTS[k] * scores[k], 0) / productionWeight;
-    const modifiers = productionWeight + WEIGHTS.age * scores.age + WEIGHTS.byeWeek * scores.byeWeek;
+    const modifiers = productionWeight + WEIGHTS.age * scores.age + WEIGHTS.byeWeek * scores.byeWeek + WEIGHTS.role * scores.role;
     const injury = (v.p.injuryStatus && INJURY_MULTIPLIER[v.p.injuryStatus]) || 1;
     const streamable = STREAMABLE_DISCOUNT[v.p.position];
     return { id: v.p.id, rank, score: production * modifiers * injury * streamable, scores: { ...scores, injury } };

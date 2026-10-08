@@ -567,6 +567,16 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
     }
     text += `**${p.name}** (${p.position} · ${p.team ?? "FA"}) has a trade value of **${p.value}**: ${p.position}${p.posRank}, #${p.overallRank} overall${p.marketRank ? `, #${p.marketRank} in the trade market` : ""}.`;
     text += ` ${he} averaging ${p.ppg} PPG${p.recentPpg !== null ? ` (${p.recentPpg} over the last 3)` : ""} and projected for ${p.rosPpg} per game the rest of the way.`;
+    const r = p.role;
+    if (!dst && p.position !== "K" && (r.snapShare !== null || r.espnStarted !== null)) {
+      const usage = [
+        r.snapShare !== null && `on the field for ${Math.round(r.snapShare * 100)}% of snaps`,
+        p.position !== "QB" && r.targetsPerGame > 0 && `${r.targetsPerGame} targets`,
+        (p.position === "RB" || p.position === "QB") && r.carriesPerGame > 0 && `${r.carriesPerGame} carries`,
+      ].filter(Boolean);
+      const starter = r.depth?.endsWith("1") ? " the starter" : r.depth ? " a backup" : "";
+      text += ` Role:${starter}${usage.length ? `, ${usage.join(", ")}${r.targetsPerGame || r.carriesPerGame ? " a game" : ""}` : ""}${r.espnStarted !== null ? `, started in ${r.espnStarted}% of ESPN leagues` : ""}.`;
+    }
     if (p.change) text += ` ${his} value is ${p.change > 0 ? "up" : "down"} ${Math.abs(p.change)} this week.`;
     if (p.injuryStatus && !text.startsWith(`**${p.name} is listed`)) text += ` Injury: **${p.injuryStatus}**.`;
     if (risk.level !== "Low") text += ` Risk: ${risk.level.toLowerCase()} (${risk.reasons.join(", ")}).`;

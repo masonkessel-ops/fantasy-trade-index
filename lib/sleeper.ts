@@ -60,6 +60,9 @@ type RawPlayer = {
   years_exp?: number | null;
   number?: number | null;
   search_rank?: number | null;
+  depth_chart_position?: string | null;
+  depth_chart_order?: number | null;
+  espn_id?: string | number | null;
 };
 
 // The full player dump is ~15 MB, too big for Next's data cache, so we
@@ -85,11 +88,14 @@ const fetchTrimmedPlayers = unstable_cache(
         yearsExp: p.years_exp ?? null,
         number: p.number ?? null,
         searchRank: p.search_rank ?? null,
+        depthPos: p.depth_chart_position ?? null,
+        depthOrder: p.depth_chart_order ?? null,
+        espnId: p.espn_id ? String(p.espn_id) : null,
       };
     }
     return out;
   },
-  ["sleeper-players-v1"],
+  ["sleeper-players-v2"],
   { revalidate: 24 * 60 * 60 },
 );
 
@@ -106,6 +112,7 @@ const KEEP_STATS = [
   "rec", "rec_tgt", "rec_yd", "rec_td",
   "fum_lost", "fgm", "fga", "xpm",
   "def_td", "int", "sack", "fum_rec", "pts_allow",
+  "off_snp", "tm_off_snp",
 ] as const;
 
 type RawLine = Record<string, number | undefined>;

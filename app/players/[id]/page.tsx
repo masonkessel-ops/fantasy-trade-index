@@ -15,6 +15,7 @@ import { PlayerRiskLine } from "./PlayerRiskLine";
 import { PlayerTradeButtons } from "./PlayerTradeButtons";
 import { OfferCard } from "@/components/OfferCard";
 import { pickOffer } from "@/lib/offers";
+import type { PlayerRole } from "@/lib/types";
 
 export async function generateMetadata({ params }: PageProps<"/players/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -23,10 +24,12 @@ export async function generateMetadata({ params }: PageProps<"/players/[id]">): 
 }
 
 const FACTOR_LABELS: Record<string, { label: string; hint: string }> = {
+  restOfSeason: { label: "Rest of season", hint: "Projected points left over replacement (Sleeper and ESPN averaged)" },
   seasonPpg: { label: "Season PPG", hint: "Points per game over replacement" },
+  opportunity: { label: "Opportunity", hint: "Expected points from his targets, carries and pass attempts" },
   recentForm: { label: "Recent form", hint: "Last 3 games over replacement" },
-  restOfSeason: { label: "Rest of season", hint: "Projected points left over replacement" },
   scarcity: { label: "Scarcity", hint: "Positional tier × how thin the position is" },
+  role: { label: "Role", hint: "Depth chart spot, snap share and ESPN start rate" },
   age: { label: "Age", hint: "1.0 until the position's age peak" },
   byeWeek: { label: "Bye week", hint: "Upcoming bye costs value" },
 };
@@ -131,6 +134,8 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
             <Kpi label="Best game" value={best?.actual ?? "–"} sub={best ? `Week ${best.week} ${best.opponent ?? ""}` : ""} />
           </div>
         )}
+
+        {value && <RoleLine role={value.role} position={player.position} team={team?.name ?? player.team} />}
       </section>
 
       {!value && (
@@ -234,6 +239,35 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
         </div>
       </section>
     </div>
+  );
+}
+
+const DEPTH_POS: Record<string, string> = { SWR: "slot WR", LWR: "WR", RWR: "WR", PK: "K" };
+
+/** "SWR1" -> "Colts starting slot WR", "RB2" -> "Colts RB #2" */
+function depthLabel(depth: string, team: string | null) {
+  const m = depth.match(/^(\D+)(\d+)$/);
+  if (!m) return null;
+  const pos = DEPTH_POS[m[1]] ?? m[1];
+  return `${team ? `${team} ` : ""}${m[2] === "1" ? `starting ${pos}` : `${pos} #${m[2]} on the depth chart`}`;
+}
+
+/** "Role: Colts starting slot WR · 79% of snaps · 7 targets/game · started in 38% of ESPN leagues" */
+function RoleLine({ role, position, team }: { role: PlayerRole; position: string; team: string | null }) {
+  if (position === "K" || position === "DST") return null;
+  const parts = [
+    role.depth && depthLabel(role.depth, team),
+    role.snapShare !== null && `${Math.round(role.snapShare * 100)}% of snaps`,
+    position === "QB" ? role.carriesPerGame > 0 && `${role.carriesPerGame} carries/game` : role.targetsPerGame > 0 && `${role.targetsPerGame} targets/game`,
+    position === "RB" && role.carriesPerGame > 0 && `${role.carriesPerGame} carries/game`,
+    role.expectedPpg !== null && `usage worth ${role.expectedPpg} pts/game`,
+    role.espnStarted !== null && `started in ${role.espnStarted}% of ESPN leagues`,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <p className="relative mt-3 text-xs text-muted">
+      <b className="font-semibold text-ink">Role:</b> {parts.join(" · ")}
+    </p>
   );
 }
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Prose } from "@/components/Prose";
 import { FAIR_PERCENT } from "@/lib/tradeAnalysis";
-import { MARKET_WEIGHT } from "@/lib/tradeValue";
+import { MARKET_WEIGHT, MARKET_WEIGHT_MIN } from "@/lib/tradeValue";
 
 export const metadata: Metadata = {
   title: "How It Works",
@@ -41,10 +41,32 @@ export default function AboutPage() {
       <Prose>
         <h2>Player values (1–100)</h2>
         <p>
-          Each value blends two things: <b>{Math.round(MARKET_WEIGHT * 100)}% the real trade market</b> (FantasyCalc, built from thousands of real fantasy trades) and{" "}
-          <b>{Math.round((1 - MARKET_WEIGHT) * 100)}% our stats model</b>. The model scores production as points over a replacement-level starter, using season points
-          per game, the last three games, rest-of-season projections, positional scarcity, age, injuries and bye weeks. That&apos;s what makes an RB1 worth more than a QB
-          who scores more raw points.
+          Each value blends <b>the real trade market</b> (FantasyCalc, built from thousands of real fantasy trades) with <b>our stats model</b>. The market leads early in
+          the season ({Math.round(MARKET_WEIGHT * 100)}% in week 1) and hands over to this season&apos;s results week by week, down to{" "}
+          {Math.round(MARKET_WEIGHT_MIN * 100)}% by week 11, so values keep moving as players prove themselves. The model scores everything as points over a
+          replacement-level starter:
+        </p>
+        <ul>
+          <li>
+            <b>Projections</b> for the rest of the season, averaging Sleeper&apos;s and ESPN&apos;s (two projection systems beat one)
+          </li>
+          <li>
+            <b>Production</b>: season points per game and the last three games
+          </li>
+          <li>
+            <b>Opportunity</b>: what his targets, carries and pass attempts usually score, so a starter getting the ball is credited even before the points show up
+          </li>
+          <li>
+            <b>Role</b>: his depth chart spot, share of snaps, and how many ESPN managers start him
+          </li>
+          <li>
+            <b>Injuries and news</b>: designations refresh through the day from ESPN and Sleeper, and trim both the model and the market price
+          </li>
+          <li>
+            <b>Scarcity, age and bye weeks</b>
+          </li>
+        </ul>
+        <p>That&apos;s what makes an RB1 worth more than a QB who scores more raw points, and a backup worth less than his name.
         </p>
         <p>
           Values are grouped into tiers: <b>Elite</b> (93+), <b>Star</b> (85+), <b>Starter</b> (76+), <b>Flex</b> (65+) and <b>Depth</b>. See them on the{" "}

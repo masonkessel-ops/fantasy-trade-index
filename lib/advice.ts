@@ -129,7 +129,7 @@ function findTrades(
           }
           // Deals both managers want come first: credit their gain, and the smaller of the two gains again.
           const mutual = theirGain === null ? 0 : 0.8 * theirGain + Math.min(myGain, theirGain);
-          const score = myGain + mutual - 8 * Math.abs(t.balance) - (give.length + get.length - 2) * 0.3;
+          const score = myGain + mutual - 25 * Math.abs(t.balance) - (give.length + get.length - 2) * 0.3;
           best.push({
             partner: { rosterId: partner.rosterId, teamName: partner.teamName },
             give: give.map((p) => p.id),

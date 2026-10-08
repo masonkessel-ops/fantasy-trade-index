@@ -59,8 +59,9 @@ export function TradeFinderPage({ players, initialAway, initialWant }: { players
           <ChevronDown className="ml-auto size-4 text-faint transition group-open:rotate-180" />
         </summary>
         <p className="mt-3">
-          Each player&apos;s value is {Math.round(MARKET_WEIGHT * 100)}% real trade-market price (from thousands of actual fantasy trades on FantasyCalc) and{" "}
-          {Math.round((1 - MARKET_WEIGHT) * 100)}% our live stats model, trimmed for injuries. Packages count for less than their sum: every player after a side&apos;s
+          Each player&apos;s value blends the real trade market (thousands of actual fantasy trades on FantasyCalc) with our live model: Sleeper and ESPN projections,
+          production, usage, depth chart role and injuries. The market counts for {Math.round(MARKET_WEIGHT * 100)}% in week 1 and less each week after, as this
+          season&apos;s results take over. Packages count for less than their sum: every player after a side&apos;s
           best one only fills a spot you could fill from your bench, so two mid-level players don&apos;t buy an elite one. The <b className="text-ink">wt</b> totals on each
           card already include that. Every idea is within {Math.round(MAX_EDGE * 100)}% of even, so the other manager has a reason to say yes, and in an imported league
           it can&apos;t weaken their lineup. Lineup numbers are projected points a week; <b className="text-ink">Win-win</b> deals improve both lineups and come first.

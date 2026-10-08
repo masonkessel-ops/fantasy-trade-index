@@ -18,11 +18,11 @@ import { evaluateTrade } from "./tradeAnalysis";
 import type { PlayerValue } from "./types";
 
 /** Best edge we'll suggest: small enough that the other manager still sees a fair deal. */
-export const MAX_EDGE = 0.06;
+export const MAX_EDGE = 0.04;
 /** When shopping a player, don't suggest selling him for less than this (you're the seller). */
-export const MAX_SHOP_DISCOUNT = 0.06;
+export const MAX_SHOP_DISCOUNT = 0.04;
 /** Most you should overpay when making an offer for a player you want. */
-export const MAX_OVERPAY = 0.12;
+export const MAX_OVERPAY = 0.08;
 /** Offers that cost your starting lineup more than this many projected points a week are left out. */
 export const MAX_LINEUP_LOSS = 4;
 /** In a league, a trade that costs the other team's lineup more than this (points a week) is a tough sell. */
@@ -31,8 +31,8 @@ export const MAX_PARTNER_LOSS = 0.5;
 const EXTRA_PLAYER_COST = 0.6;
 /** How much taking on extra risk (0–1 scale) lowers an idea's ranking, in points a week. */
 const RISK_PENALTY = 2.5;
-/** Ranking cost of a lopsided deal (per 100% of edge either way): even deals get accepted. */
-const LOPSIDED_COST = 8;
+/** Ranking cost of a lopsided deal (per 100% of edge either way): the closer to dead even, the higher it ranks. */
+const LOPSIDED_COST = 25;
 
 export interface FinderPool {
   rosterId: number | null;

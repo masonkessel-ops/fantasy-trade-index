@@ -23,6 +23,10 @@ export interface Player {
   yearsExp: number | null;
   number: number | null;
   searchRank: number | null;
+  /** depth chart spot on his NFL team, e.g. "SWR" order 1 = starting slot receiver (null if unlisted) */
+  depthPos: string | null;
+  depthOrder: number | null;
+  espnId: string | null;
 }
 
 export interface FantasyPoints {
@@ -54,6 +58,18 @@ export interface ScheduleGame {
 }
 
 /** What the trade-value table and detail page render. */
+export interface PlayerRole {
+  depth: string | null;
+  /** share of his team's offensive snaps over his last few games, 0–1 */
+  snapShare: number | null;
+  targetsPerGame: number;
+  carriesPerGame: number;
+  /** expected fantasy points per game from that usage */
+  expectedPpg: number | null;
+  /** % of ESPN leagues starting him this week (null if ESPN doesn't list him) */
+  espnStarted: number | null;
+}
+
 export interface PlayerValue {
   id: string;
   name: string;
@@ -77,6 +93,8 @@ export interface PlayerValue {
   rosPoints: number;
   /** projected points per remaining week for a lineup (counts byes, missed games and current injuries) */
   weekly: number;
+  /** his role: depth chart spot (e.g. "SWR1"), recent usage and how many ESPN managers start him */
+  role: PlayerRole;
   byeWeek: number | null;
   /** trade value after each week of the season (index 0 = week 1) */
   trend: (number | null)[];
