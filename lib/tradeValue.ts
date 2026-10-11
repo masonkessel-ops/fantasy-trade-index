@@ -82,7 +82,7 @@ export const REPLACEMENT_RANK: Record<Position, number> = {
   QB: 14,
   RB: 32,
   WR: 38,
-  TE: 14,
+  TE: 11,
   K: 13,
   DST: 13,
 };
@@ -91,7 +91,7 @@ export const REPLACEMENT_RANK: Record<Position, number> = {
 export const POSITION_SCARCITY: Record<Position, number> = {
   RB: 1,
   WR: 0.85,
-  TE: 0.8,
+  TE: 0.65,
   QB: 0.55,
   DST: 0.15,
   K: 0.1,

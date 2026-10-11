@@ -253,7 +253,32 @@ function blendWithMarket(
     return { r, share };
   });
   const top = Math.max(1e-9, ...blended.map((b) => b.share));
-  return blended.map(({ r, share }) => ({ ...r, ...fromShare(share / top), share: share / top }));
+  for (const b of blended) b.share /= top;
+  onMarketCurve(blended, market, data);
+  return blended.map(({ r, share }) => ({ ...r, ...fromShare(share), share }));
+}
+
+/**
+ * Price every spot the way the trade market prices that rank: our blend decides the
+ * ORDER, the market's value-by-rank curve decides the PRICE. A straight blend left
+ * mid-tier players (and mid-tier TEs and QBs most of all) 20–70% richer than real
+ * trades pay, which made 2-for-1s lopsided. Below the market's last listed player,
+ * our own curve carries on from there. Kickers and defenses keep their own small values.
+ */
+function onMarketCurve(blended: { r: { id: string }; share: number }[], market: Map<string, MarketValue>, data: SeasonData) {
+  const isSkill = (id: string) => {
+    const pos = data.players[id]?.position;
+    return !!pos && pos !== "K" && pos !== "DST";
+  };
+  const curve = [...market.entries()].filter(([id]) => isSkill(id)).map(([, m]) => m.share).sort((a, b) => b - a);
+  if (curve.length < 50) return;
+  const top = curve[0];
+  const skill = blended.filter((b) => isSkill(b.r.id)).sort((a, b) => b.share - a.share);
+  const last = curve.length - 1;
+  const pivot = Math.max(1e-9, skill[last]?.share ?? 1);
+  skill.forEach((b, i) => {
+    b.share = i <= last ? curve[i] / top : Math.min(curve[last] / top, (b.share * curve[last]) / top / pivot);
+  });
 }
 
 async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
