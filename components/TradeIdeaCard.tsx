@@ -4,10 +4,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import clsx from "clsx";
-import { ArrowDownUp, ArrowRight } from "lucide-react";
+import { ArrowDownUp, ArrowRight, Users } from "lucide-react";
 import { PlayerAvatar, PosBadge, ValueBadge } from "./PlayerBits";
 import { evaluateTrade, gradeTone, tradeGrade } from "@/lib/tradeAnalysis";
 import { tradeRiskReward } from "@/lib/risk";
+import { crowdNote } from "@/lib/crowd";
 import { RiskRewardPill } from "./RiskReward";
 import type { PlayerValue } from "@/lib/types";
 
@@ -47,6 +48,7 @@ export function TradeIdeaCard({
   const href = `/trade?give=${give.join(",")}&get=${get.join(",")}${partnerRosterId ? `&partner=${partnerRosterId}` : ""}`;
   const v = VERDICT[r.verdict];
   const grade = tradeGrade(r.balance);
+  const crowd = crowdNote(giveP, getP);
   return (
     <motion.div
       initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -80,6 +82,11 @@ export function TradeIdeaCard({
         <Side label="You get" players={getP} total={Math.round(r.adjGet)} color="text-volt" />
         {rr && <RiskRewardPill rr={rr} className="mt-3" />}
         {note && <div className="mt-2 text-xs leading-relaxed text-muted">{note}</div>}
+        {crowd && (
+          <p className={clsx("mt-1.5 flex items-start gap-1.5 text-xs", crowd.tone === "good" ? "text-up" : "text-flame")}>
+            <Users className="mt-0.5 size-3.5 shrink-0" /> {crowd.text}
+          </p>
+        )}
         <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-rocket">
           Open in Trade Analyzer <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
         </span>

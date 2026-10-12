@@ -11,6 +11,7 @@ import { playerRisk, tradeRiskReward } from "../risk";
 import { SLOT_LABEL, analyzeTeam, bestLineup, type PositionStrength } from "../teamAnalysis";
 import { FAIR_PERCENT, evaluateTrade, suggestBalancers } from "../tradeAnalysis";
 import { bothWin, findOffers, isWinWin, shopPlayers, type FinderIdea, type FinderPool } from "../tradeFinder";
+import { crowdVotes } from "../crowd";
 import type { SavedTeam } from "../myTeam";
 import type { PlayerValue, Position } from "../types";
 import type { NameIndex, NameMatch } from "./names";
@@ -576,6 +577,11 @@ export async function answer(question: string, env: BotEnv, focus: string[]): Pr
       ].filter(Boolean);
       const starter = r.depth?.endsWith("1") ? " the starter" : r.depth ? " a backup" : "";
       text += ` Role:${starter}${usage.length ? `, ${usage.join(", ")}${r.targetsPerGame || r.carriesPerGame ? " a game" : ""}` : ""}${r.espnStarted !== null ? `, started in ${r.espnStarted}% of ESPN leagues` : ""}.`;
+    }
+    const votes = crowdVotes(p.crowd);
+    if (p.crowd && votes >= 8) {
+      const pc = (n: number) => Math.round((n / votes) * 100);
+      text += ` In Keep · Trade · Cut, managers keep ${dst ? "them" : "him"} ${pc(p.crowd.keep)}%, trade ${pc(p.crowd.trade)}%, cut ${pc(p.crowd.cut)}%.`;
     }
     if (p.change) text += ` ${his} value is ${p.change > 0 ? "up" : "down"} ${Math.abs(p.change)} this week.`;
     if (p.injuryStatus && !text.startsWith(`**${p.name} is listed`)) text += ` Injury: **${p.injuryStatus}**.`;

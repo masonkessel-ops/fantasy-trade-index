@@ -3,7 +3,10 @@
  * Sits on top of Next's fetch cache so we don't re-parse / re-trim large
  * Sleeper payloads on every request while a server instance is warm.
  */
-type Entry = { value?: unknown; expires: number; pending?: Promise<unknown> };
+type Entry = { value?: unknown; expires: number; pending?: Promise<unknown>; startedAt?: number };
+
+/** A refresh still running after this long is treated as stuck, and a new one starts. */
+const STUCK_MS = 45_000;
 
 const g = globalThis as unknown as { __trMemo?: Map<string, Entry> };
 const store = (g.__trMemo ??= new Map<string, Entry>());
@@ -15,7 +18,7 @@ export function memo<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promi
   if (entry && entry.value !== undefined && entry.expires > now) {
     return Promise.resolve(entry.value as T);
   }
-  if (entry?.pending) {
+  if (entry?.pending && now - (entry.startedAt ?? 0) < STUCK_MS) {
     // Serve stale data while a refresh is in flight.
     return entry.value !== undefined ? Promise.resolve(entry.value as T) : (entry.pending as Promise<T>);
   }
@@ -35,6 +38,6 @@ export function memo<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promi
       throw err;
     });
 
-  store.set(key, { value: entry?.value, expires: entry?.expires ?? 0, pending });
+  store.set(key, { value: entry?.value, expires: entry?.expires ?? 0, pending, startedAt: now });
   return entry?.value !== undefined ? Promise.resolve(entry.value as T) : pending;
 }

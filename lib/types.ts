@@ -95,6 +95,8 @@ export interface PlayerValue {
   weekly: number;
   /** his role: depth chart spot (e.g. "SWR1"), recent usage and how many ESPN managers start him */
   role: PlayerRole;
+  /** Keep · Trade · Cut votes (null before anyone has voted); never changes his value */
+  crowd: { keep: number; trade: number; cut: number } | null;
   byeWeek: number | null;
   /** trade value after each week of the season (index 0 = week 1) */
   trend: (number | null)[];

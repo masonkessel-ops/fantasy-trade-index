@@ -17,6 +17,7 @@ import { Avatar } from "./TeamSetup";
 import { LeagueError, refetchLeague, teamFromLeague } from "./leagueClient";
 import { GamePlan } from "./GamePlan";
 import { Lineup } from "./Lineup";
+import { MatchupCard } from "./MatchupCard";
 import { PlayerSheet, type PlayerWeek } from "./PlayerSheet";
 
 const PROVIDER_LABEL: Record<string, string> = { sleeper: "Sleeper", espn: "ESPN", yahoo: "Yahoo" };
@@ -211,6 +212,8 @@ export function TeamDashboard({
           )}
         </Stat>
       </div>
+
+      {team.source === "sleeper" && team.league && <MatchupCard team={team} scoring={scoring} />}
 
       <Lineup
         team={team}

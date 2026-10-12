@@ -12,6 +12,7 @@
  *  - getting more players than you send means dropping someone (flagged on the card).
  * Ideas that make both lineups better rank first.
  */
+import { crowdAppeal } from "./crowd";
 import { tradeRiskReward } from "./risk";
 import { SLOT_LABEL, bestLineup } from "./teamAnalysis";
 import { evaluateTrade } from "./tradeAnalysis";
@@ -33,6 +34,14 @@ const EXTRA_PLAYER_COST = 0.6;
 const RISK_PENALTY = 2.5;
 /** Ranking cost of a lopsided deal (per 100% of edge either way): the closer to dead even, the higher it ranks. */
 const LOPSIDED_COST = 25;
+/**
+ * Ranking credit (points a week per unit of crowd appeal, -1 … 1) for sending players other
+ * managers like in Keep · Trade · Cut: they're easier to get accepted. Values never change.
+ */
+export const CROWD_APPEAL_CREDIT = 2;
+
+/** How much other managers will like receiving these players. */
+export const sendAppeal = (give: PlayerValue[]) => give.reduce((s, p) => s + crowdAppeal(p.crowd), 0) * CROWD_APPEAL_CREDIT;
 
 export interface FinderPool {
   rosterId: number | null;
@@ -150,7 +159,7 @@ export function shopPlayers(give: PlayerValue[], mine: PlayerValue[], pools: Fin
         if (!r) continue;
         const risk = tradeRiskReward(give, get)?.riskChange ?? 0;
         const extra = Math.max(0, get.length - give.length);
-        const score = bothWin(r.lineupGain, r.theirGain) - Math.abs(t.balance) * LOPSIDED_COST - extra * EXTRA_PLAYER_COST - risk * RISK_PENALTY;
+        const score = bothWin(r.lineupGain, r.theirGain) - Math.abs(t.balance) * LOPSIDED_COST - extra * EXTRA_PLAYER_COST - risk * RISK_PENALTY + sendAppeal(give);
         perPartner.push({
           give: give.map((p) => p.id),
           get: get.map((p) => p.id),
@@ -188,7 +197,7 @@ export function findOffers(target: PlayerValue[], mine: PlayerValue[], rosterPos
       const risk = tradeRiskReward(give, target)?.riskChange ?? 0;
       // Overpaying a little is fine (it gets the deal done); squeezing them isn't.
       const lopsided = Math.abs(t.balance) * LOPSIDED_COST * (t.balance < 0 ? 0.5 : 1);
-      const score = bothWin(r.lineupGain, r.theirGain) - lopsided - (r.theirConcern ? 1.5 : 0) - (size - 1) * 0.3 - risk * RISK_PENALTY;
+      const score = bothWin(r.lineupGain, r.theirGain) - lopsided - (r.theirConcern ? 1.5 : 0) - (size - 1) * 0.3 - risk * RISK_PENALTY + sendAppeal(give);
       ideas.push({
         give: give.map((p) => p.id),
         get: target.map((p) => p.id),
@@ -245,7 +254,7 @@ export function packageDeals(mine: PlayerValue[], pools: FinderPool[], rosterPos
         const r = rosterCheck(give, get, mine, rosterPositions, pool, true);
         if (!r || r.lineupGain < 0) continue; // a package should make your lineup better
         const risk = tradeRiskReward(give, get)?.riskChange ?? 0;
-        const score = bothWin(r.lineupGain, r.theirGain) - Math.abs(t.balance) * LOPSIDED_COST - risk * RISK_PENALTY;
+        const score = bothWin(r.lineupGain, r.theirGain) - Math.abs(t.balance) * LOPSIDED_COST - risk * RISK_PENALTY + sendAppeal(give);
         perPartner.push({
           give: give.map((p) => p.id),
           get: get.map((p) => p.id),

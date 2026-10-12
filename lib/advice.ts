@@ -2,7 +2,7 @@ import "server-only";
 import { REGULAR_SEASON_WEEKS, getNflState, getScores, getWeekProjections, getWeekStats } from "./sleeper";
 import { bestLineup } from "./teamAnalysis";
 import { evaluateTrade } from "./tradeAnalysis";
-import { MAX_EDGE, MAX_PARTNER_LOSS, MAX_SHOP_DISCOUNT, lineupPoints } from "./tradeFinder";
+import { MAX_EDGE, MAX_PARTNER_LOSS, MAX_SHOP_DISCOUNT, lineupPoints, sendAppeal } from "./tradeFinder";
 import { getValueBoard } from "./values";
 import type { PlayerValue, Position, Scoring } from "./types";
 
@@ -129,7 +129,7 @@ function findTrades(
           }
           // Deals both managers want come first: credit their gain, and the smaller of the two gains again.
           const mutual = theirGain === null ? 0 : 0.8 * theirGain + Math.min(myGain, theirGain);
-          const score = myGain + mutual - 25 * Math.abs(t.balance) - (give.length + get.length - 2) * 0.3;
+          const score = myGain + mutual - 25 * Math.abs(t.balance) - (give.length + get.length - 2) * 0.3 + sendAppeal(give);
           best.push({
             partner: { rosterId: partner.rosterId, teamName: partner.teamName },
             give: give.map((p) => p.id),

@@ -13,9 +13,10 @@ import { getPlayers } from "@/lib/sleeper";
 import { statLine } from "@/lib/statLine";
 import { PlayerRiskLine } from "./PlayerRiskLine";
 import { PlayerTradeButtons } from "./PlayerTradeButtons";
+import { WatchButton } from "@/components/WatchButton";
 import { OfferCard } from "@/components/OfferCard";
 import { pickOffer } from "@/lib/offers";
-import type { PlayerRole } from "@/lib/types";
+import type { PlayerRole, PlayerValue } from "@/lib/types";
 
 export async function generateMetadata({ params }: PageProps<"/players/[id]">): Promise<Metadata> {
   const { id } = await params;
@@ -117,6 +118,7 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
         {value && (
           <div className="relative mt-5 flex flex-wrap items-center gap-2">
             <PlayerTradeButtons id={player.id} name={player.name} />
+            <WatchButton id={player.id} value={value.value} name={player.name} />
             <Link
               href={`/compare?ids=${player.id}`}
               className="inline-flex h-10 items-center gap-2 rounded-full border border-line-strong px-4 text-sm font-semibold transition hover:bg-white/5"
@@ -136,6 +138,7 @@ export default async function PlayerPage({ params }: PageProps<"/players/[id]">)
         )}
 
         {value && <RoleLine role={value.role} position={player.position} team={team?.name ?? player.team} />}
+        {value && player.position !== "K" && player.position !== "DST" && <CrowdLine crowd={value.crowd} />}
       </section>
 
       {!value && (
@@ -267,6 +270,28 @@ function RoleLine({ role, position, team }: { role: PlayerRole; position: string
   return (
     <p className="relative mt-3 text-xs text-muted">
       <b className="font-semibold text-ink">Role:</b> {parts.join(" · ")}
+    </p>
+  );
+}
+
+/** Keep · Trade · Cut split for this player, with a link to vote. */
+function CrowdLine({ crowd }: { crowd: PlayerValue["crowd"] }) {
+  const total = crowd ? crowd.keep + crowd.trade + crowd.cut : 0;
+  const pct = (n: number) => Math.round((n / total) * 100);
+  return (
+    <p className="relative mt-1.5 text-xs text-muted">
+      <b className="font-semibold text-ink">Managers say:</b>{" "}
+      {total >= 4 && crowd ? (
+        <>
+          <span className="text-up">{pct(crowd.keep)}% keep</span> · <span className="text-volt">{pct(crowd.trade)}% trade</span> ·{" "}
+          <span className="text-down">{pct(crowd.cut)}% cut</span> <span className="text-faint">({total} votes)</span> ·{" "}
+        </>
+      ) : (
+        "not enough votes yet · "
+      )}
+      <Link href="/play" className="font-semibold text-rocket hover:underline">
+        Play Keep · Trade · Cut
+      </Link>
     </p>
   );
 }

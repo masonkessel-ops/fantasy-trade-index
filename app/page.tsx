@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Flame, ListOrdered, MessagesSquare, Radio, Repeat, TrendingDown, TrendingUp, Users } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Flame, ListOrdered, MessagesSquare, Radio, Repeat, Shuffle, TrendingDown, TrendingUp, Trophy, Users } from "lucide-react";
 import { ChangePill, PlayerAvatar, PosBadge, ValueBadge } from "@/components/PlayerBits";
 import { Sparkline } from "@/components/Charts";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
+import { WatchlistPanel } from "@/components/WatchlistPanel";
 import { getLiveWeek } from "@/lib/live";
 import { getScoring } from "@/lib/prefs";
 import { getValueBoard } from "@/lib/values";
@@ -93,6 +94,34 @@ export default async function Home() {
             </span>
           </Link>
         ))}
+      </section>
+
+      <WatchlistPanel players={board.players.map((p) => ({ id: p.id, name: p.name, position: p.position, team: p.team, value: p.value, injuryStatus: p.injuryStatus }))} />
+
+      {/* Games */}
+      <section className="grid animate-rise gap-3 [animation-delay:50ms] md:grid-cols-2">
+        <Link href="/pickem" className="group relative overflow-hidden rounded-2xl border border-line bg-surface p-5 transition hover:border-volt/50">
+          <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-volt/20 blur-3xl" />
+          <div className="relative flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-volt">
+            <Trophy className="size-4" /> Free game · Week {board.week}
+          </div>
+          <div className="relative mt-1 font-display text-2xl font-extrabold uppercase italic">Weekly Pick&apos;em</div>
+          <p className="relative mt-1 text-sm text-muted">Five head-to-heads. Pick who scores more, then climb the season leaderboard.</p>
+          <span className="relative mt-3 inline-flex items-center gap-1 text-sm font-semibold text-volt">
+            Make your picks <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+          </span>
+        </Link>
+        <Link href="/play" className="group relative overflow-hidden rounded-2xl border border-line bg-surface p-5 transition hover:border-rocket/50">
+          <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-brand/25 blur-3xl" />
+          <div className="relative flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-rocket">
+            <Shuffle className="size-4" /> Quick game · 10 seconds a round
+          </div>
+          <div className="relative mt-1 font-display text-2xl font-extrabold uppercase italic">Keep · Trade · Cut</div>
+          <p className="relative mt-1 text-sm text-muted">Three players: keep one, trade one, cut one. See how everyone else voted.</p>
+          <span className="relative mt-3 inline-flex items-center gap-1 text-sm font-semibold text-rocket">
+            Play a round <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+          </span>
+        </Link>
       </section>
 
       {/* Hot players */}

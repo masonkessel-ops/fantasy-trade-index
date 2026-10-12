@@ -23,6 +23,36 @@ export async function command<T>(cmd: string[]): Promise<T> {
   return data.result as T;
 }
 
+/** Run several commands in one round trip; results come back in order. */
+export async function pipeline<T = unknown>(cmds: string[][]): Promise<T[]> {
+  if (!cmds.length) return [];
+  const res = await fetch(`${url().replace(/\/$/, "")}/pipeline`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+    body: JSON.stringify(cmds),
+    cache: "no-store",
+  });
+  const data = (await res.json().catch(() => null)) as { result?: T; error?: string }[] | null;
+  if (!res.ok || !Array.isArray(data)) throw new Error(`store_${res.status}`);
+  const failed = data.find((d) => d.error);
+  if (failed) throw new Error(failed.error);
+  return data.map((d) => d.result as T);
+}
+
+/** At most `limit` hits per `windowSec` for this key (always true without a database). */
+export async function rateLimit(key: string, limit: number, windowSec = 3600) {
+  if (!storeConfigured()) return true;
+  // Start the window only if it isn't running yet, then count this hit.
+  const [, n] = await pipeline<number>([
+    ["SET", `rl:${key}`, "0", "EX", String(windowSec), "NX"],
+    ["INCR", `rl:${key}`],
+  ]);
+  return n <= limit;
+}
+
+/** The caller's IP (for rate limits). */
+export const clientIp = (req: Request) => (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+
 const teamKey = (sub: string) => `team:${sub}`;
 
 export async function loadTeam(sub: string): Promise<unknown | null> {

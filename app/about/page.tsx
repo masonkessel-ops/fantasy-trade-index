@@ -88,6 +88,10 @@ export default function AboutPage() {
           league, don&apos;t weaken the other team&apos;s lineup, so the other manager has a reason to say yes. Deals that make both lineups better (marked{" "}
           <b>Win-win</b>) come first. Cards tell you when you&apos;d need to drop someone.
         </p>
+        <p>
+          Votes from <Link href="/play">Keep · Trade · Cut</Link> never change a player&apos;s value. They tell the finder who other managers like, so offers built
+          around crowd favorites rank a little higher (they&apos;re easier to get accepted), and cards point out an easy sell or a player managers are down on.
+        </p>
 
         <h2>Auto lineup</h2>
         <p>

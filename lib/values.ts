@@ -13,6 +13,7 @@ import { FORMULA_KEY, FULL_SNAP_SHARE, computeTradeValues, depthScore, fromShare
 import { getMarketValues, type MarketValue } from "./market";
 import { getEspnPlayers, type EspnPlayer } from "./espnPlayers";
 import { buildMatcher } from "./playerMatch";
+import { getCrowd } from "./ktc";
 import type { Player, PlayerRole, PlayerValue, Position, Scoring, ValueBoard, WeekLine } from "./types";
 
 /**
@@ -225,10 +226,16 @@ function buildInputs(
   });
 }
 
-export function getValueBoard(scoring: Scoring): Promise<ValueBoard> {
-  return getNflState().then((state) =>
-    memo(`board:${state.season}:${state.week}:${scoring}:${FORMULA_KEY}:m`, 2 * 60_000, () => computeBoard(scoring)),
-  );
+export async function getValueBoard(scoring: Scoring): Promise<ValueBoard> {
+  const state = await getNflState();
+  const board = await memo(`board:${state.season}:${state.week}:${scoring}:${FORMULA_KEY}:m`, 2 * 60_000, () => computeBoard(scoring));
+  // Keep · Trade · Cut votes ride along for trade suggestions (they never change values).
+  const crowd = await getCrowd(board.players.map((p) => p.id));
+  const voted = (id: string) => {
+    const c = crowd[id];
+    return c && c.keep + c.trade + c.cut > 0 ? c : null;
+  };
+  return { ...board, players: board.players.map((p) => ({ ...p, crowd: voted(p.id) })) };
 }
 
 /**
@@ -351,6 +358,7 @@ async function computeBoard(scoring: Scoring): Promise<ValueBoard> {
       rosPpg: round1(input.rosPpg),
       rosPoints: Math.round(input.rosPpg * input.rosGames),
       role: roleOf(data, p, usageOf(data, r.id, week, rates)),
+      crowd: null,
       weekly: input.rosWeeks ? round1(((input.rosPpg * input.rosGames) / input.rosWeeks) * ((p.injuryStatus && LINEUP_INJURY[p.injuryStatus]) || 1)) : 0,
       byeWeek: input.byeWeek,
       trend,

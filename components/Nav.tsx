@@ -15,6 +15,8 @@ import {
   Newspaper,
   Radio,
   Repeat,
+  Shuffle,
+  Target,
   TrendingUp,
   Trophy,
   Users,
@@ -50,6 +52,13 @@ const GROUPS: { title: string | null; items: NavItem[] }[] = [
     items: [
       { href: "/my-team", label: "My Team", short: "Team", icon: Users },
       { href: "/assistant", label: "Trade Assistant", short: "Ask", icon: MessagesSquare },
+    ],
+  },
+  {
+    title: "Play",
+    items: [
+      { href: "/pickem", label: "Weekly Pick'em", short: "Pick'em", icon: Target },
+      { href: "/play", label: "Keep · Trade · Cut", short: "KTC", icon: Shuffle },
     ],
   },
   {
